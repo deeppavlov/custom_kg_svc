@@ -22,6 +22,13 @@ def create_property_type(value) -> neomodel.core.Property:
             prop_type = StringProperty()
     return prop_type
 
+# look for dates in string
+def check_for_date(prop):
+    if isinstance(prop, str):
+        if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',prop):
+            return datetime.strptime(prop, '%Y-%m-%d').date()
+    return prop
+
 def add_relationships_to_class(class_:str, relations:dict):
     rels= list(globals()[f"{class_}"].__all_relationships__)
     for rel, val in relations.items():
@@ -101,8 +108,7 @@ def read_entity(class_:str, properties:dict):
 
 def update_entity(entity:StructuredNode, updates: dict):
     for property in updates:
-        if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',updates[property]):
-            updates[property] = datetime.strptime(updates[property], '%Y-%m-%d').date()
+        updates[property]= check_for_date(updates[property])
         if property not in [tupl[0] for tupl in globals()[entity.__label__].__all_properties__]:
             add_properties_to_class(entity.__label__, {property:updates[property]})
         setattr(entity, property, updates[property])
