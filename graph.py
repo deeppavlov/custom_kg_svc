@@ -117,9 +117,9 @@ def delete_entity(entity:StructuredNode):
 def create_relationship(entity1:StructuredNode, entity2:StructuredNode, relationship:str):
     if relationship not in entity1.__dict__:
         add_relationships_to_class(entity1.__class__.__label__, 
-                                    {relationship: RelationshipTo(entity2, relationship)})
-        setattr(entity1, relationship, entity1.__class__().__dict__[relationship])
-        entity1.save()
+                                    {relationship: RelationshipTo(entity2.__class__, relationship)})
+        setattr(entity1, relationship, entity1.defined_properties(rels=True)[relationship]\
+                                                .build_manager(entity1, relationship))
     entity1.__dict__[relationship].connect(entity2)
 
 def delete_relationship(entity1:StructuredNode, entity2:StructuredNode, relationship:str):
@@ -137,5 +137,6 @@ yoga = read_entity('Habit', {'name':'Yoga'})
 # create_relationship(jack, sport, 'LIKES')
 # jack = create_entity('User', {'name':'Jack Ryan'})
 # jack.__dict__['KEEPS_UP'].disconnect(Habit.nodes.get(name='Alcohol'))
-# create_entity('Program', {'name':'Robotics', 'date':'1999-11-11'})
+# robotics = create_entity('Program', {'name':'Robotics', 'date':'1999-11-11'})
+# create_relationship(jack, robotics, 'STUDY')
 print('end')
