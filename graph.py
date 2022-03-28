@@ -31,7 +31,8 @@ def add_relationships_to_class(class_:str, relations:dict):
 def add_properties_to_class(class_:str, properties:dict):
     props= list(globals()[f"{class_}"].__all_properties__)
     for prop, val in properties.items():
-        setattr(globals()[f"{class_}"], prop, create_property_type(val))
+        val = create_property_type(val)
+        setattr(globals()[f"{class_}"], prop, val)
         props.append((prop, val))
     props = tuple(props)
     globals()[f"{class_}"].__all_properties__ = props 
@@ -91,7 +92,7 @@ def create_entity(class_:str, properties:dict) -> StructuredNode:
         if property not in [tupl[0] for tupl in globals()[class_].__all_properties__]:
             add_properties_to_class(class_, {property:properties[property]})
         setattr(entity, property, properties[property])
-    entity.save() # There's a problem when create new class for first time "str has no db_property"
+    entity.save()
     return entity
 
 def read_entity(class_:str, properties:dict):
