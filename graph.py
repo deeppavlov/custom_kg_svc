@@ -3,7 +3,7 @@ import logging
 import re
 # from unittest import result
 from neomodel import db
-from datetime import datetime
+from datetime import datetime, date
 from neomodel import (StructuredNode, StringProperty, IntegerProperty,
     RelationshipTo, Relationship, DateProperty, ArrayProperty)
 import neomodel 
@@ -13,6 +13,8 @@ def create_property_type(value) -> neomodel.core.Property:
         prop_type = ArrayProperty()
     elif isinstance(value, int):
         prop_type = IntegerProperty()
+    elif isinstance(value, date):
+        prop_type = DateProperty()
     elif isinstance(value, str):
         if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',value):
             prop_type = DateProperty()
@@ -89,6 +91,8 @@ def create_entity(class_:str, properties:dict) -> StructuredNode:
         create_class(class_)
     entity = globals()[class_]()
     for property in properties:
+        if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',properties[property]):
+            properties[property] = datetime.strptime(properties[property], '%Y-%m-%d').date()
         if property not in [tupl[0] for tupl in globals()[class_].__all_properties__]:
             add_properties_to_class(class_, {property:properties[property]})
         setattr(entity, property, properties[property])
@@ -133,4 +137,5 @@ yoga = read_entity('Habit', {'name':'Yoga'})
 # create_relationship(jack, sport, 'LIKES')
 # jack = create_entity('User', {'name':'Jack Ryan'})
 # jack.__dict__['KEEPS_UP'].disconnect(Habit.nodes.get(name='Alcohol'))
+# create_entity('Program', {'name':'Robotics', 'date':'1999-11-11'})
 print('end')
