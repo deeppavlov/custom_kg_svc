@@ -90,13 +90,7 @@ def create_entity(class_:str, properties:dict) -> StructuredNode:
     if class_ not in [value.__label__ for value in db._NODE_CLASS_REGISTRY.values()]:
         create_class(class_)
     entity = globals()[class_]()
-    for property in properties:
-        if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',properties[property]):
-            properties[property] = datetime.strptime(properties[property], '%Y-%m-%d').date()
-        if property not in [tupl[0] for tupl in globals()[class_].__all_properties__]:
-            add_properties_to_class(class_, {property:properties[property]})
-        setattr(entity, property, properties[property])
-    entity.save()
+    update_entity(entity, properties)
     return entity
 
 def read_entity(class_:str, properties:dict):
@@ -106,8 +100,12 @@ def read_entity(class_:str, properties:dict):
         logging.error('There is no such a class')
 
 def update_entity(entity:StructuredNode, updates: dict):
-    for key, val in updates.items():
-        setattr(entity, key, val)
+    for property in updates:
+        if re.fullmatch(r'(\d{4}-\d{2}-\d{2})',updates[property]):
+            updates[property] = datetime.strptime(updates[property], '%Y-%m-%d').date()
+        if property not in [tupl[0] for tupl in globals()[entity.__label__].__all_properties__]:
+            add_properties_to_class(entity.__label__, {property:updates[property]})
+        setattr(entity, property, updates[property])
     entity.save()
 
 def delete_entity(entity:StructuredNode):
