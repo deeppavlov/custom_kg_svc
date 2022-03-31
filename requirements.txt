@@ -1,6 +1,2 @@
-neo4j-driver==4.3.6
-neobolt==1.7.17
 neomodel==4.0.8
-pytz==2021.3
-Shapely==1.7.1
-six==1.16.0
+pydantic[dotenv]==1.9.0
