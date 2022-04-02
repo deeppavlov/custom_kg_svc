@@ -45,17 +45,17 @@ TEST_ENTITIES = {
 }
 
 TEST_MATCHES = [
-    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", "User", {"name": "Sandy Bates"}),
-    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", "User", {"name": "Jack Ryan"}),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", "Habit", {"name": "Smoking"}),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", "Habit", {"name": "Reading"}),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", "Habit", {"name": "Dancing"}),
-    ("User", {"name": "Jack Ryan"}, "KEEPS_UP", "Habit", {"name": "Dancing"}),
-    ("User", {"name": "Jack Ryan"}, "LIKES", "Interest", {"name": "Mindfulness"}),
-    ("User", {"name": "Jack Ryan"}, "DISLIKES", "Interest", {"name": "Theater"}),
-    ("Habit", {"name": "Smoking"}, "CAUSES", "Disease", {"name": "Cancer"}),
-    ("Interest", {"name": "Medicine"}, "CURES", "Disease", {"name": "Cancer"}),
-    ("Habit", {"name": "Yoga"}, "RELATED_TO", "Interest", {"name": "Mindfulness"}),
+    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", {"on":datetime.strptime("2022-01-20", "%Y-%m-%d")}, "User", {"name": "Sandy Bates"}),
+    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", {}, "User", {"name": "Jack Ryan"}),
+    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Smoking"}),
+    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Reading"}),
+    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
+    ("User", {"name": "Jack Ryan"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
+    ("User", {"name": "Jack Ryan"}, "LIKES", {}, "Interest", {"name": "Mindfulness"}),
+    ("User", {"name": "Jack Ryan"}, "DISLIKES", {}, "Interest", {"name": "Theater"}),
+    ("Habit", {"name": "Smoking"}, "CAUSES", {}, "Disease", {"name": "Cancer"}),
+    ("Interest", {"name": "Medicine"}, "CURES", {}, "Disease", {"name": "Cancer"}),
+    ("Habit", {"name": "Yoga"}, "RELATED_TO", {}, "Interest", {"name": "Mindfulness"}),
 ]
 
 
@@ -67,8 +67,8 @@ def test_populate(drop=True):
         for entity_dict in entities:
             graph.create_kind_node(kind, entity_dict)
 
-    for kind_a, filter_a, rel, kind_b, filter_b in TEST_MATCHES:
-        graph.create_relationship(kind_a, filter_a, rel, kind_b, filter_b)
+    for kind_a, filter_a, rel, rel_dict, kind_b, filter_b in TEST_MATCHES:
+        graph.create_relationship(kind_a, filter_a, rel, rel_dict, kind_b, filter_b)
 
 
 test_populate()

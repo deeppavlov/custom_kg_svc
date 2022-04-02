@@ -19,7 +19,7 @@ def create_kind_node(kind: str, node_dict: dict):
 
 
 def create_relationship(
-    kind_a: str, filter_a: dict, relationship: str, kind_b: str, filter_b: dict
+    kind_a: str, filter_a: dict, relationship: str, rel_dict: dict, kind_b: str, filter_b: dict
 ):
     """Find nodes A and B and set a relationship between them
 
@@ -32,10 +32,10 @@ def create_relationship(
     """
     match_a, filter_a = querymaker.match_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_query("b", kind_b, filter_b)
-    rel = querymaker.merge_relationship_query("a", relationship, "b")
+    rel = querymaker.merge_relationship_query("a", relationship, rel_dict, "b")
 
     query = "\n".join([match_a, match_b, rel])
-    params = {**filter_a, **filter_b}
+    params = {**filter_a, **filter_b, **rel_dict}
 
     db.cypher_query(query, params)
 

@@ -53,7 +53,7 @@ def match_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]
 
 
 def merge_relationship_query(
-    var_name_a: str, relationship: str, var_name_b: str
+    var_name_a: str, relationship: str, rel_dict: dict, var_name_b: str
 ) -> str:
     """Prepare and sanitize MERGE CYPHER query for relationship creation.
     Should be used together with match_query.
@@ -66,6 +66,7 @@ def merge_relationship_query(
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
     relationship = sanitize_alphanumeric(relationship)
-
-    query = f"MERGE ({var_name_a})-[:{relationship}]->({var_name_b})"
+    rel_dict = sanitize_dict_keys(rel_dict)
+    param_placeholders = ', '.join(f'{k}: ${k}' for k in rel_dict.keys())
+    query = f"MERGE ({var_name_a})-[:{relationship} {{{param_placeholders}}}]->({var_name_b})"
     return query
