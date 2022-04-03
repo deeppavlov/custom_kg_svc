@@ -70,3 +70,24 @@ def merge_relationship_query(
     param_placeholders = ', '.join(f'{k}: ${k}' for k in rel_dict.keys())
     query = f"MERGE ({var_name_a})-[:{relationship} {{{param_placeholders}}}]->({var_name_b})"
     return query
+
+def match_relationship_query(
+    var_name_a: str, var_name: str, relationship: str, filter_dict: dict, var_name_b: str
+) -> Tuple[str, dict]:
+    """Prepare and sanitize MATCH CYPHER query for relationships.
+
+    :param var_name: variable name which CYPHER will use to identify the relationship match
+    :param var_name_a: variable name which CYPHER will use to identify the first node match
+    :param var_name_b: variable name which CYPHER will use to identify the second node match
+    :param relationship: relationship type
+    :param filter_dict: relationship keyword arguments for matching
+    :return: query string, disambiguated parameters dict (parameter keys are renamed from {key} to {key}_{var_name})
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    relationship = sanitize_alphanumeric(relationship)
+    filter_dict = sanitize_dict_keys(filter_dict)
+
+    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict.keys())
+    updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
+    query = f"MATCH ({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->({var_name_b})"
+    return query, updated_filter_dict
