@@ -32,6 +32,25 @@ def search_nodes(kind: str, node_dict: dict = {}, LIMIT=10) -> list:
     nodes, _ = db.cypher_query(query, filter_a)
     return nodes
 
+def update_node(kind: str, updates: dict, filter_node: dict={}):
+    """Update a node properties
+
+    :param kind: node kind
+    :param filter_node: node match filter
+    :param updates: new properties and updated properties
+    :return:
+    """
+    if search_nodes(kind, filter_node):
+        match_node, filter_node = querymaker.match_node_query('a', kind, filter_node)
+        set_queries = []
+        for property_ in updates.copy():
+            set_query, updated_property = querymaker.set_property_query('a', property_)
+            updates[updated_property] = updates.pop(property_)
+            set_queries.append(set_query)
+        params = {**filter_node, **updates}
+        query = "\n".join([match_node, *set_queries])
+        db.cypher_query(query, params)
+
 def create_relationship(
     kind_a: str, filter_a: dict, relationship: str, rel_dict: dict, kind_b: str, filter_b: dict
 ):
@@ -56,7 +75,7 @@ def create_relationship(
 
 def search_relationships(
      relationship: str, filter_dict: dict={}, kind_a: str='', filter_a: dict={}, kind_b: str='', 
-     filter_b: dict={}, LIMIT=10
+     filter_b: dict={}, LIMIT=10, programmer=0
 ) -> list:
     """Search existing relationships
 
@@ -80,8 +99,38 @@ def search_relationships(
     query = '\n'.join([node_a_query, node_b_query, rel_query, return_])
     params = {**filter_a, **filter_b, **filter_dict}
     
+    if programmer:
+        query = '\n'.join([node_a_query, node_b_query, rel_query])
+        return query, params
+
     rels, _ = db.cypher_query(query, params)
     return rels
+
+def update_relationship(
+    relationship: str, updates: dict, filter_rel: dict={}, 
+    kind_a: str='', filter_a: dict={}, kind_b: str='', filter_b: dict={}
+):
+    """Update a relationship properties
+
+    :param relationship: relationship type
+    :param updates: new properties and updated properties
+    :param filter_rel: relationship params
+    :param kind_a: node A kind
+    :param filter_a: node A match filter
+    :param kind_b: node B kind
+    :param filter_b: node B match filter
+    :return:
+    """
+    match_relationship, params = search_relationships(relationship, filter_rel, kind_a, filter_a, kind_b, 
+                                                        filter_b, programmer=1)
+    set_queries = []
+    for property_ in updates.copy():
+        set_query, updated_property = querymaker.set_property_query('r', property_)
+        updates[updated_property] = updates.pop(property_)
+        set_queries.append(set_query)
+    query = "\n".join([match_relationship, *set_queries])
+    params = {**params, **updates}
+    db.cypher_query(query, params)
 
 ontology_settings = OntologySettings()
 

@@ -97,5 +97,15 @@ def test_search():
                 habit[1].type, habit[1]._properties, 
                 habit[1].end_node._properties['name'])
 
+def test_update():
+    graph.update_node('User', {'height':175, 'name':'Jay Ryan'}, filter_node={'name':'Jack Ryan'})
+    graph.update_node('User', {'country':'Russia'})
+    # Sandy does all her habits every Friday
+    graph.update_relationship('KEEPS_UP', {'every':'Friday'}, kind_a= 'User', filter_a={'name':'Sandy Bates'})
+    # Sandy started to do her habits, which are since March, as daily routine
+    graph.update_relationship('KEEPS_UP', updates={'every':'day'}, filter_rel={'since':'March'}, kind_a= 'User', filter_a={'name':'Sandy Bates'})
+    graph.update_relationship('KEEPS_UP', updates={'since':'February'}, kind_a= 'User', filter_a={'name':'Sandy Bates'}, kind_b='Habit', filter_b={'label':'Good'})
+
 test_populate()
 test_search()
+test_update()
