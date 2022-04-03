@@ -34,8 +34,8 @@ def merge_node_query(kind: str, node_dict: dict) -> str:
     return query
 
 
-def match_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]:
-    """Prepare and sanitize MATCH CYPHER query.
+def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]:
+    """Prepare and sanitize MATCH CYPHER query for nodes.
 
     :param var_name: variable name which CYPHER will use to identify the match
     :param kind: node kind
@@ -58,9 +58,9 @@ def merge_relationship_query(
     """Prepare and sanitize MERGE CYPHER query for relationship creation.
     Should be used together with match_query.
 
-    :param var_name_a: variable name which CYPHER will use to identify the first match
+    :param var_name_a: variable name which CYPHER will use to identify the first node match
     :param relationship: kind of relationship
-    :param var_name_b: variable name which CYPHER will use to identify the second match
+    :param var_name_b: variable name which CYPHER will use to identify the second node match
     :return: query string
     """
     var_name_a = sanitize_alphanumeric(var_name_a)

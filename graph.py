@@ -44,8 +44,8 @@ def create_relationship(
     :param filter_b: node B match filter
     :return:
     """
-    match_a, filter_a = querymaker.match_query("a", kind_a, filter_a)
-    match_b, filter_b = querymaker.match_query("b", kind_b, filter_b)
+    match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
+    match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
     rel = querymaker.merge_relationship_query("a", relationship, rel_dict, "b")
 
     query = "\n".join([match_a, match_b, rel])
