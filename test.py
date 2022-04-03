@@ -106,6 +106,12 @@ def test_update():
     graph.update_relationship('KEEPS_UP', updates={'every':'day'}, filter_rel={'since':'March'}, kind_a= 'User', filter_a={'name':'Sandy Bates'})
     graph.update_relationship('KEEPS_UP', updates={'since':'February'}, kind_a= 'User', filter_a={'name':'Sandy Bates'}, kind_b='Habit', filter_b={'label':'Good'})
 
+def test_delete():
+    graph.delete_relationship('KEEPS_UP', kind_a='User', filter_a={'name':'Sandy Bates'}, 
+                                kind_b ='Habit', filter_b={'name':'Dancing'})
+    graph.delete_node('User', {'name':'Jay Ryan'}, completely=1)
+
 test_populate()
 test_search()
 test_update()
+test_delete()

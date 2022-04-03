@@ -51,6 +51,23 @@ def update_node(kind: str, updates: dict, filter_node: dict={}):
         query = "\n".join([match_node, *set_queries])
         db.cypher_query(query, params)
 
+def delete_node(kind: str, node_dict: dict, completely=False):
+    """Delete a node completely from database or make it in the past
+    :param kind: node kind
+    :param node_dict: node params
+    :param completely: if True, then the node will be deleted completely 
+                        from DB with all its relationships
+    """
+    if completely:
+        match_a, filter_a = querymaker.match_node_query('a', kind, node_dict)
+        delete_a = querymaker.delete_query('a')
+        
+        query = "\n".join([match_a, delete_a])
+        params = filter_a
+        
+        db.cypher_query(query, params)
+        return
+
 def create_relationship(
     kind_a: str, filter_a: dict, relationship: str, rel_dict: dict, kind_b: str, filter_b: dict
 ):
@@ -130,6 +147,26 @@ def update_relationship(
         set_queries.append(set_query)
     query = "\n".join([match_relationship, *set_queries])
     params = {**params, **updates}
+    db.cypher_query(query, params)
+
+def delete_relationship(
+    relationship: str, filter_rel: dict={}, kind_a: str='', filter_a: dict={}, kind_b: str='', 
+     filter_b: dict={}
+):
+    """Delete a relationship between two nodes A and B
+    :param relationship: relationship type
+    :param filter_rel: relationship params
+    :param kind_a: node A kind
+    :param filter_a: node A match filter
+    :param kind_b: node B kind
+    :param filter_b: node B match filter
+    :return:
+    """
+    match_relationship, params = search_relationships(relationship, filter_rel, kind_a, filter_a, kind_b, 
+                                                        filter_b, programmer=1)
+    delete_query = querymaker.delete_query('r', node=False)
+    query = "\n".join([match_relationship, delete_query])
+    
     db.cypher_query(query, params)
 
 ontology_settings = OntologySettings()

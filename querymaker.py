@@ -104,3 +104,14 @@ def match_relationship_query(
     updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
     query = f"MATCH ({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->({var_name_b})"
     return query, updated_filter_dict
+
+def delete_query(var_name, node=True):
+    """Prepare DELETE CYPHER query for nodes and relationships.
+    :params var_name: variable name which CYPHER will use to identify the match
+    :params node: True for deleting nodes, False for relationships
+    :return: query string
+    """
+    query = f'DELETE {var_name}'
+    if node:
+        query = 'DETACH ' + query
+    return query
