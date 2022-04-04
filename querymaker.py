@@ -111,6 +111,7 @@ def delete_query(var_name, node=True):
     :params node: True for deleting nodes, False for relationships
     :return: query string
     """
+    var_name = sanitize_alphanumeric(var_name)
     query = f'DELETE {var_name}'
     if node:
         query = 'DETACH ' + query
