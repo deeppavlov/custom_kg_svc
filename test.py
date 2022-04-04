@@ -45,9 +45,23 @@ TEST_ENTITIES = {
 }
 
 TEST_MATCHES = [
-    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", {"on":datetime.strptime("2022-01-20", "%Y-%m-%d")}, "User", {"name": "Sandy Bates"}),
+    (
+        "Bot",
+        {"name": "ChatBot"},
+        "TALKED_WITH",
+        {"on": datetime.strptime("2022-01-20", "%Y-%m-%d")},
+        "User",
+        {"name": "Sandy Bates"},
+    ),
     ("Bot", {"name": "ChatBot"}, "TALKED_WITH", {}, "User", {"name": "Jack Ryan"}),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {"since":"March"}, "Habit", {"name": "Smoking"}),
+    (
+        "User",
+        {"name": "Sandy Bates"},
+        "KEEPS_UP",
+        {"since": "March"},
+        "Habit",
+        {"name": "Smoking"},
+    ),
     ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Reading"}),
     ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
     ("User", {"name": "Jack Ryan"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
@@ -70,46 +84,82 @@ def test_populate(drop=True):
     for kind_a, filter_a, rel, rel_dict, kind_b, filter_b in TEST_MATCHES:
         graph.create_relationship(kind_a, filter_a, rel, rel_dict, kind_b, filter_b)
 
-def test_search():
-    print('Search nodes')
-    habits = graph.search_nodes('Habit')
-    bad_habits = graph.search_nodes('Habit', {'label':'Bad'})
-    for key, value in {'habits': habits, 'bad_habits':bad_habits}.items():
-        print('\n',key)
-        for habit in value:
-            print(habit[0]._properties['name'])
 
-    print('Search relationships')
-    habits = graph.search_relationships('KEEPS_UP')
-    habits_since_march = graph.search_relationships('KEEPS_UP', {'since':'March'})
-    sandy_habits = graph.search_relationships('KEEPS_UP', kind_a= 'User', filter_a={'name':'Sandy Bates'})
+def test_search():
+    print("Search nodes")
+    habits = graph.search_nodes("Habit")
+    bad_habits = graph.search_nodes("Habit", {"label": "Bad"})
+    for key, value in {"habits": habits, "bad_habits": bad_habits}.items():
+        print("\n", key)
+        for habit in value:
+            print(habit[0]._properties["name"])
+
+    print("Search relationships")
+    habits = graph.search_relationships("KEEPS_UP")
+    habits_since_march = graph.search_relationships("KEEPS_UP", {"since": "March"})
+    sandy_habits = graph.search_relationships(
+        "KEEPS_UP", kind_a="User", filter_a={"name": "Sandy Bates"}
+    )
     sandy_bad_habits = graph.search_relationships(
-        'KEEPS_UP', kind_a= 'User', filter_a={'name':'Sandy Bates'}, 
-                    kind_b='Habit', filter_b={'label':'Bad'}
+        "KEEPS_UP",
+        kind_a="User",
+        filter_a={"name": "Sandy Bates"},
+        kind_b="Habit",
+        filter_b={"label": "Bad"},
     )
     for key, value in {
-        'habits': habits, 'habits_since_march': habits_since_march,
-        'sandy_habits':sandy_habits, 'sandy_bad_habits':sandy_bad_habits
+        "habits": habits,
+        "habits_since_march": habits_since_march,
+        "sandy_habits": sandy_habits,
+        "sandy_bad_habits": sandy_bad_habits,
     }.items():
-        print('\n',key)
+        print("\n", key)
         for habit in value:
-            print(habit[1].start_node._properties['name'], 
-                habit[1].type, habit[1]._properties, 
-                habit[1].end_node._properties['name'])
+            print(
+                habit[1].start_node._properties["name"],
+                habit[1].type,
+                habit[1]._properties,
+                habit[1].end_node._properties["name"],
+            )
+
 
 def test_update():
-    graph.update_node('User', {'height':175, 'name':'Jay Ryan'}, filter_node={'name':'Jack Ryan'})
-    graph.update_node('User', {'country':'Russia'})
+    graph.update_node(
+        "User", {"height": 175, "name": "Jay Ryan"}, filter_node={"name": "Jack Ryan"}
+    )
+    graph.update_node("User", {"country": "Russia"})
     # Sandy does all her habits every Friday
-    graph.update_relationship('KEEPS_UP', {'every':'Friday'}, kind_a= 'User', filter_a={'name':'Sandy Bates'})
+    graph.update_relationship(
+        "KEEPS_UP", {"every": "Friday"}, kind_a="User", filter_a={"name": "Sandy Bates"}
+    )
     # Sandy started to do her habits, which are since March, as daily routine
-    graph.update_relationship('KEEPS_UP', updates={'every':'day'}, filter_rel={'since':'March'}, kind_a= 'User', filter_a={'name':'Sandy Bates'})
-    graph.update_relationship('KEEPS_UP', updates={'since':'February'}, kind_a= 'User', filter_a={'name':'Sandy Bates'}, kind_b='Habit', filter_b={'label':'Good'})
+    graph.update_relationship(
+        "KEEPS_UP",
+        updates={"every": "day"},
+        filter_rel={"since": "March"},
+        kind_a="User",
+        filter_a={"name": "Sandy Bates"},
+    )
+    graph.update_relationship(
+        "KEEPS_UP",
+        updates={"since": "February"},
+        kind_a="User",
+        filter_a={"name": "Sandy Bates"},
+        kind_b="Habit",
+        filter_b={"label": "Good"},
+    )
+
 
 def test_delete():
-    graph.delete_relationship('KEEPS_UP', kind_a='User', filter_a={'name':'Sandy Bates'}, 
-                                kind_b ='Habit', filter_b={'name':'Dancing'})
-    graph.delete_node('User', {'name':'Jay Ryan'}, completely=1)
+    graph.delete_relationship(
+        "KEEPS_UP",
+        kind_a="User",
+        filter_a={"name": "Sandy Bates"},
+        kind_b="Habit",
+        filter_b={"name": "Dancing"},
+    )
+    graph.delete_node("User", {"name": "Jay Ryan"}, completely=1)
+
 
 test_populate()
 test_search()
