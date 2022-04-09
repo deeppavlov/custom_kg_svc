@@ -44,15 +44,12 @@ def update_node(kind: str, updates: dict, filter_node: dict = None):
     :return:
     """
     filter_node = filter_node or {}
-    if search_nodes(kind, filter_node):
+    nodes = search_nodes(kind, filter_node)
+    if len(nodes)==1: # we need to update exactly one node
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
-        set_queries = []
-        for property_ in updates.copy():
-            set_query, updated_property = querymaker.set_property_query("a", property_)
-            updates[updated_property] = updates.pop(property_)
-            set_queries.append(set_query)
-        params = {**filter_node, **updates}
-        query = "\n".join([match_node, *set_queries])
+        set_query, updated_updates = querymaker.set_property_query("a", updates)
+        params = {**filter_node, **updated_updates}
+        query = "\n".join([match_node, set_query])
         db.cypher_query(query, params)
 
 
@@ -174,13 +171,9 @@ def update_relationship(
     match_relationship, params = search_relationships(
         relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
     )
-    set_queries = []
-    for property_ in updates.copy():
-        set_query, updated_property = querymaker.set_property_query("r", property_)
-        updates[updated_property] = updates.pop(property_)
-        set_queries.append(set_query)
-    query = "\n".join([match_relationship, *set_queries])
-    params = {**params, **updates}
+    set_query, updated_updates = querymaker.set_property_query("r", updates)
+    query = "\n".join([match_relationship, set_query])
+    params = {**params, **updated_updates}
     db.cypher_query(query, params)
 
 

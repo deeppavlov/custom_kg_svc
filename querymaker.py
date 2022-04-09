@@ -52,18 +52,22 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
     return query, updated_filter_dict
 
 
-def set_property_query(var_name: str, property_: str):
+def set_property_query(var_name: str, properties_dict: dict):
     """Prepare and sanitize SET CYPHER query.
     :params var_name: variable name which CYPHER will use to identify the match
     :params property_: the property label to be updated
     :return: query string, disambiguated property label
     """
     var_name = sanitize_alphanumeric(var_name)
-    property_ = sanitize_alphanumeric(property_)
+    properties_dict = sanitize_dict_keys(properties_dict)
 
-    updated_property = f"new_{property_}_{var_name}"
-    query = f"SET {var_name}.{property_} = ${updated_property}"
-    return query, updated_property
+    updated_filter_dict = {f"new_{k}_{var_name}": v for k, v in properties_dict.items()}
+    param_placeholders = ", ".join(
+        f"{var_name}.{k}= $new_{k}_{var_name}" for k in properties_dict.keys()
+    )
+    query = f"SET {param_placeholders}"
+
+    return query, updated_filter_dict
 
 
 def merge_relationship_query(
