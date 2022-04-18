@@ -1,5 +1,6 @@
 from typing import Tuple
-
+import json
+from datetime import datetime
 
 def sanitize_alphanumeric(input_value: str):
     """Remove characters which are not letters, numbers or underscore
@@ -30,7 +31,12 @@ def merge_node_query(kind: str, node_dict: dict) -> str:
     node_dict = sanitize_dict_keys(node_dict)
 
     param_placeholders = ", ".join(f"{k}: ${k}" for k in node_dict.keys())
-    query = f"MERGE (:{kind} {{{param_placeholders}}})"
+    query = f"""
+    MERGE (n:{kind} {{{param_placeholders}}})
+    ON CREATE 
+        SET n._creation_timestamp = {datetime.now().timestamp()}
+        SET n._deleted = False
+    """
     return query
 
 
@@ -52,7 +58,7 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
     return query, updated_filter_dict
 
 
-def set_property_query(var_name: str, properties_dict: dict):
+def set_property_query(var_name: str, properties_dict: dict, to_json=False) -> Tuple[str, dict]:
     """Prepare and sanitize SET CYPHER query.
     :params var_name: variable name which CYPHER will use to identify the match
     :params property_: the property label to be updated
@@ -62,9 +68,17 @@ def set_property_query(var_name: str, properties_dict: dict):
     properties_dict = sanitize_dict_keys(properties_dict)
 
     updated_filter_dict = {f"new_{k}_{var_name}": v for k, v in properties_dict.items()}
-    param_placeholders = ", ".join(
-        f"{var_name}.{k}= $new_{k}_{var_name}" for k in properties_dict.keys()
-    )
+    if to_json:
+        updated_filter_dict = {k: json.dumps(v) for k, v in updated_filter_dict.items()}
+        param_placeholders = ", ".join(
+            f"""{var_name}.{k}= apoc.convert.toJson(
+                apoc.convert.fromJsonMap($new_{k}_{var_name})[toString(id({var_name}))]
+            )""" for k in properties_dict.keys()
+        )
+    else:
+        param_placeholders = ", ".join(
+            f"{var_name}.{k}= $new_{k}_{var_name}" for k in properties_dict.keys()
+        )
     query = f"SET {param_placeholders}"
 
     return query, updated_filter_dict
@@ -86,7 +100,12 @@ def merge_relationship_query(
     relationship = sanitize_alphanumeric(relationship)
     rel_dict = sanitize_dict_keys(rel_dict)
     param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_dict.keys())
-    query = f"MERGE ({var_name_a})-[:{relationship} {{{param_placeholders}}}]->({var_name_b})"
+    query = f"""
+    MERGE ({var_name_a})-[r:{relationship} {{{param_placeholders}}}]->({var_name_b})
+    ON CREATE 
+        SET r._creation_timestamp = {datetime.now().timestamp()}
+        SET r._deleted = False
+    """
     return query
 
 
@@ -127,3 +146,23 @@ def delete_query(var_name, node=True):
     if node:
         query = "DETACH " + query
     return query
+
+
+def where_query(var_name: str, properties_dict: dict, logical_op: str = 'AND') -> Tuple[str, dict]:
+    """Prepare and sanitize WHERE CYPHER query.
+    :params var_name: variable name which CYPHER will use to identify the match
+    :params properties_dict: the properties to filter the match query
+    :params logical_op: the logical operator to use between all statements
+    :return: query string, disambiguated property label
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    properties_dict = sanitize_dict_keys(properties_dict)
+
+    updated_filter_dict = {f"new_{k}_{var_name}": v for k, v in properties_dict.items()}
+
+    param_placeholders = f" {logical_op} ".join(
+        f"{var_name}.{k}= $new_{k}_{var_name}" for k in properties_dict.keys()
+    )
+    query = f"WHERE {param_placeholders}"
+
+    return query, updated_filter_dict

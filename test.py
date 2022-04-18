@@ -89,10 +89,9 @@ def test_search():
     print("Search nodes")
     habits = graph.search_nodes("Habit")
     bad_habits = graph.search_nodes("Habit", {"label": "Bad"})
-    for key, value in {"habits": habits, "bad_habits": bad_habits}.items():
-        print("\n", key)
-        for habit in value:
-            print(habit[0]._properties["name"])
+
+    print("Habits:\t", graph.get_properties(habits))
+    print("Bad habits:\t", graph.get_properties(bad_habits))
 
     print("Search relationships")
     habits = graph.search_relationships("KEEPS_UP")
@@ -114,18 +113,12 @@ def test_search():
         "sandy_bad_habits": sandy_bad_habits,
     }.items():
         print("\n", key)
-        for habit in value:
-            print(
-                habit[1].start_node._properties["name"],
-                habit[1].type,
-                habit[1]._properties,
-                habit[1].end_node._properties["name"],
-            )
+        graph.display_relationships(value)
 
 
 def test_update():
     graph.update_node(
-        "User", {"height": 175, "name": "Jay Ryan"}, filter_node={"name": "Jack Ryan"}
+        "User", {"height": 175}, filter_node={"name": "Jack Ryan"}
     )
     graph.update_node("User", {"country": "Russia"})
     # Sandy does all her habits every Friday
@@ -158,10 +151,44 @@ def test_delete():
         kind_b="Habit",
         filter_b={"name": "Dancing"},
     )
-    graph.delete_node("User", {"name": "Jay Ryan"}, completely=1)
+    graph.delete_node("User", {"name": "Jack Ryan"})
 
 
-test_populate()
+def test_lookup():
+    date_of_search = datetime(year=2022,month=4,day=18,hour=1,minute=0)
+    node_lookup = graph.history_lookup_node(
+        'User', {}, date_of_search
+    )
+    node_today = graph.search_nodes(
+        'User', {}
+    )
+    relationship_lookup = graph.history_lookup_relationship(
+        "KEEPS_UP",
+        date_of_search,
+        {},
+        kind_a="User",
+        filter_a={"name": "Mark Drake"},
+        kind_b="Interest",
+        filter_b={"name": "Sport"},
+    )
+    relationship_today = graph.search_relationships(
+        "KEEPS_UP",
+        kind_a="User",
+        filter_a={"name": "Mark Drake"},
+        kind_b="Interest",
+        filter_b={"name": "Sport"},
+    )
+    print(date_of_search,'\t', node_lookup)
+    print('Today', end='\t')
+    print(graph.get_properties(node_today))
+    print(date_of_search, '\t', relationship_lookup)
+    print('Today', end='\t')
+    graph.display_relationships(relationship_today)
+
+graph.display_ontology()
+test_populate(drop=False)
 test_search()
 test_update()
+test_lookup()
 test_delete()
+test_update()

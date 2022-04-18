@@ -1,6 +1,11 @@
+import logging
+from datetime import datetime
 from neomodel import db, config, clear_neo4j_database
 from settings import OntologySettings
 import querymaker
+import funcs
+
+NUM_ELEMENTS_IN_REL_OBJ = 3
 
 
 def drop_database():
@@ -35,40 +40,75 @@ def search_nodes(kind: str, node_dict: dict = None, limit=10) -> list:
     return nodes
 
 
-def update_node(kind: str, updates: dict, filter_node: dict = None):
+def update_node(kind: str, updates: dict, filter_node: dict = None, save=True, debug=True):
     """Update a node properties
 
     :param kind: node kind
     :param filter_node: node match filter
     :param updates: new properties and updated properties
+    :param save: if True the old properties will be saved as history
+    :param debug: if True, error messages are activated
     :return:
     """
     filter_node = filter_node or {}
     nodes = search_nodes(kind, filter_node)
-    if len(nodes)==1: # we need to update exactly one node
+    if nodes:
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
+        if funcs.check_deletion("a", match_node, filter_node):
+            if debug:
+                logging.error("You can't update deleted nodes %s %s", kind, filter_node)
+            return
+        if save:
+            properties = funcs.call_properties("a", match_node, filter_node)
+            for node in properties.values():
+                for prop in node.copy():
+                    if prop[0] == "_":
+                        node.pop(prop)
+            funcs.write_history("a", match_node, filter_node, properties)
+        where, condition_dict = querymaker.where_query("a", {'_deleted':False})
         set_query, updated_updates = querymaker.set_property_query("a", updates)
-        params = {**filter_node, **updated_updates}
-        query = "\n".join([match_node, set_query])
+        params = {**filter_node, **updated_updates, **condition_dict}
+        query = "\n".join([match_node, where, set_query])
         db.cypher_query(query, params)
 
 
-def delete_node(kind: str, node_dict: dict, completely=False):
+def delete_node(kind: str, node_dict: dict, completely: bool =False):
     """Delete a node completely from database or make it in the past
     :param kind: node kind
     :param node_dict: node params
     :param completely: if True, then the node will be deleted completely
-                        from DB with all its relationships
+                        from DB with all its relationships.
+                        if False, then the node should be just marked as
+                        deleted so that no operation could be done on it anymore
     """
+    updated_dict={}
+    match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
     if completely:
-        match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
         delete_a = querymaker.delete_query("a")
+    else:
+        if funcs.check_deletion("a", match_a, filter_a):
+            logging.error("You can't delete deleted nodes")
+            return
+        delete_a, updated_dict = querymaker.set_property_query(
+            'a', {'_deleted':True, 'deletion_timestamp':datetime.now().timestamp()}
+        )
+    query = "\n".join([match_a, delete_a])
+    params = {**filter_a, **updated_dict}
 
-        query = "\n".join([match_a, delete_a])
-        params = filter_a
+    db.cypher_query(query, params)
 
-        db.cypher_query(query, params)
-        return
+
+def history_lookup_node(kind, filter_node, date: datetime) -> dict:
+    """Look at how the node looked like in a specific date
+
+    :param kind: node kind
+    :param filter_node: node match filter
+    :param date: date in history to look up for
+    :return: node properties at the specific date
+    """
+    var_name="a"
+    match_a, filter_node = querymaker.match_node_query(var_name, kind, filter_node)
+    return funcs.history_lookup(var_name, match_a, filter_node, date)
 
 
 def create_relationship(
@@ -153,6 +193,8 @@ def update_relationship(
     filter_a: dict = None,
     kind_b: str = "",
     filter_b: dict = None,
+    save = True,
+    debug = True,
 ):
     """Update a relationship properties
 
@@ -163,18 +205,36 @@ def update_relationship(
     :param filter_a: node A match filter
     :param kind_b: node B kind
     :param filter_b: node B match filter
+    :param save: if True, the old properties will be saved as history
+    :param debug: if True, error messages are activated
     :return:
     """
     filter_rel = filter_rel or {}
     filter_a = filter_a or {}
     filter_b = filter_b or {}
-    match_relationship, params = search_relationships(
-        relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
+    relationships = search_relationships(
+        relationship, filter_rel, kind_a, filter_a, kind_b, filter_b
     )
-    set_query, updated_updates = querymaker.set_property_query("r", updates)
-    query = "\n".join([match_relationship, set_query])
-    params = {**params, **updated_updates}
-    db.cypher_query(query, params)
+    if relationships:
+        match_relationship, params = search_relationships(
+            relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
+        )
+        if funcs.check_deletion("r", match_relationship, params):
+            if debug:
+                logging.error("You can't update deleted relationships %s %s", relationship, filter_rel)
+            return
+        if save:
+            properties = funcs.call_properties("r", match_relationship, params)
+            for rel in properties.values():
+                for prop in rel.copy():
+                    if prop[0] == "_":
+                        rel.pop(prop)
+            funcs.write_history("r", match_relationship, params, properties)
+        where, condition_dict = querymaker.where_query("r", {'_deleted':False})
+        set_query, updated_updates = querymaker.set_property_query("r", updates)
+        query = "\n".join([match_relationship, where, set_query])
+        params = {**params, **updated_updates, **condition_dict}
+        db.cypher_query(query, params)
 
 
 def delete_relationship(
@@ -184,6 +244,7 @@ def delete_relationship(
     filter_a: dict = None,
     kind_b: str = "",
     filter_b: dict = None,
+    completely: bool = False,
 ):
     """Delete a relationship between two nodes A and B
     :param relationship: relationship type
@@ -192,19 +253,112 @@ def delete_relationship(
     :param filter_a: node A match filter
     :param kind_b: node B kind
     :param filter_b: node B match filter
+    :param completely: if True, then the relationship will be deleted completely
+                        from DB.
+                        if False, then it should be just marked as
+                        deleted so that no operation could be done on it anymore
     :return:
     """
     filter_rel = filter_rel or {}
     filter_a = filter_a or {}
     filter_b = filter_b or {}
+    updated_dict = {}
     match_relationship, params = search_relationships(
         relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
     )
-    delete_query = querymaker.delete_query("r", node=False)
+    if completely:
+        delete_query = querymaker.delete_query("r", node=False)
+    else:
+        if funcs.check_deletion("r", match_relationship, params):
+            logging.error("You can't delete deleted nodes")
+            return
+        delete_query, updated_dict = querymaker.set_property_query(
+            'r', {'_deleted':True, 'deletion_timestamp':datetime.now().timestamp()}
+        )
+    params = {**params, **updated_dict}
     query = "\n".join([match_relationship, delete_query])
 
     db.cypher_query(query, params)
 
+
+def history_lookup_relationship(
+    relationship: str,
+    date: datetime,
+    filter_rel: dict,
+    kind_a: str,
+    filter_a: dict,
+    kind_b: str,
+    filter_b: dict,
+):
+    """Look at how the relationship looked like in a specific date
+
+    :param relationship: relationship type
+    :param date: date in history to look up for
+    :param filter_rel: relationship match filter
+    :param kind_a: node A kind
+    :param filter_a: node A match filter
+    :param kind_b: node B kind
+    :param filter_b: node B match filter
+    :return: relationship properties at the specific date
+    """
+    var_name="r"
+    match_relationship, params = search_relationships(
+        relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
+    )
+    return funcs.history_lookup(var_name, match_relationship, params, date)
+
+
+def display_relationships(relationships: list):
+    """Display list of relationships in a pretty way
+    """
+    for relationship in relationships:
+        start_node = {k:v for k,v in relationship[0].items()}
+        properties ={k:v for k,v in relationship[1].items()}
+        end_node = {k:v for k,v in relationship[2].items()}
+        if '_history' in properties:
+            properties.pop('_history')
+        print('{:12s} -[ {:10s} {:20s} ]->\t{:15s}'\
+            .format(
+                start_node["name"], relationship[1].type, str(properties), end_node["name"])
+            )
+
+
+def get_properties(objects: list) -> dict:
+    """Get properties from a list of nodes or relationships objects
+
+    :params objects: a list of nodes or relationships objects
+    :return: dictionary of properties
+    """
+    if not objects:
+        return {}
+    index = 1 if len(objects[0])==NUM_ELEMENTS_IN_REL_OBJ else 0
+    obj_properties = []
+    for obj in objects:
+        obj ={k:v for k,v in obj[index].items()}
+        if '_history' in obj:
+            obj.pop('_history')
+        obj_properties.append(obj)
+    return obj_properties
+
+
+def display_ontology():
+    """Show datamodel (ontology graph)
+
+    :return:
+    """
+    query = 'call db.schema.visualization()'
+    results, _ = db.cypher_query(query)
+    [nodes, relationships] = results[0]
+    print("\nOntology's Kinds:")
+    for node in nodes:
+        node = {k:v for k,v in node.items()}
+        print(node['name'])
+
+    print("\nOntology's relationships:")
+    for rel in relationships:
+        start = {k:v for k,v in rel.start_node.items()}
+        end = {k:v for k,v in rel.end_node.items()}
+        print(start['name'], f'-[{rel.type}]->', end['name'])
 
 ontology_settings = OntologySettings()
 
