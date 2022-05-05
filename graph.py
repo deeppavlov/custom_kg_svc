@@ -40,7 +40,7 @@ def search_nodes(kind: str, node_dict: dict = None, limit=10) -> list:
     return nodes
 
 
-def update_node(kind: str, updates: dict, filter_node: dict = None, save=True, debug=True):
+def update_node(kind: str, updates: dict, change_date, filter_node: dict = None, save=True, debug=True):
     """Update a node properties
 
     :param kind: node kind
@@ -64,7 +64,7 @@ def update_node(kind: str, updates: dict, filter_node: dict = None, save=True, d
                 for prop in node.copy():
                     if prop[0] == "_":
                         node.pop(prop)
-            funcs.write_history("a", match_node, filter_node, properties)
+            funcs.write_history("a", match_node, filter_node, properties, change_date)
         where, condition_dict = querymaker.where_query("a", {'_deleted':False})
         set_query, updated_updates = querymaker.set_property_query("a", updates)
         params = {**filter_node, **updated_updates, **condition_dict}
@@ -188,6 +188,7 @@ def search_relationships(
 def update_relationship(
     relationship: str,
     updates: dict,
+    change_date,
     filter_rel: dict = None,
     kind_a: str = "",
     filter_a: dict = None,
@@ -229,7 +230,7 @@ def update_relationship(
                 for prop in rel.copy():
                     if prop[0] == "_":
                         rel.pop(prop)
-            funcs.write_history("r", match_relationship, params, properties)
+            funcs.write_history("r", match_relationship, params, properties, change_date)
         where, condition_dict = querymaker.where_query("r", {'_deleted':False})
         set_query, updated_updates = querymaker.set_property_query("r", updates)
         query = "\n".join([match_relationship, where, set_query])

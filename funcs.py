@@ -57,7 +57,7 @@ def call_properties(var_name: str, match: str, filter_dict: dict) -> dict:
     return properties
 
 
-def write_history(var_name: str, match: str, filter_dict: dict, properties: dict):
+def write_history(var_name: str, match: str, filter_dict: dict, properties: dict, change_date):
     """Add records to the _history property of many nodes/relationships
 
     :params var_name: variable name which CYPHER will use to identify the match
@@ -77,7 +77,7 @@ def write_history(var_name: str, match: str, filter_dict: dict, properties: dict
         histories[id_]= history
 
     for id_, history in histories.copy().items():
-        now = int(datetime.now().timestamp())
+        now = change_date
         if not histories[id_]:
             histories[id_] = {}
         histories[id_][now] = properties[id_]
