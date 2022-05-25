@@ -21,6 +21,7 @@ def sanitize_dict_keys(input_value: dict):
 
 def merge_node_query(kind: str, node_dict: dict) -> str:
     """Prepare and sanitize MERGE CYPHER query for node creation.
+    Should be used together with match_query.
 
     :param kind: node kind
     :param node_dict: node keyword arguments
@@ -48,12 +49,17 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict.keys())
     updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
+    if kind:
+        kind = sanitize_alphanumeric(kind)
     query = f"MATCH ({var_name}:{kind} {{{param_placeholders}}})"
+    else:
+        query = f"MATCH ({var_name} {{{param_placeholders}}})"
     return query, updated_filter_dict
 
 
 def set_property_query(var_name: str, properties_dict: dict):
     """Prepare and sanitize SET CYPHER query.
+    Should be used together with match_query.
     :params var_name: variable name which CYPHER will use to identify the match
     :params property_: the property label to be updated
     :return: query string, disambiguated property label
@@ -85,7 +91,7 @@ def merge_relationship_query(
     var_name_b = sanitize_alphanumeric(var_name_b)
     relationship = sanitize_alphanumeric(relationship)
     rel_dict = sanitize_dict_keys(rel_dict)
-    param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_dict.keys())
+    param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_dict)
     query = f"MERGE ({var_name_a})-[:{relationship} {{{param_placeholders}}}]->({var_name_b})"
     return query
 
@@ -110,7 +116,7 @@ def match_relationship_query(
     relationship = sanitize_alphanumeric(relationship)
     filter_dict = sanitize_dict_keys(filter_dict)
 
-    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict.keys())
+    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict)
     updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
     query = f"MATCH ({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->({var_name_b})"
     return query, updated_filter_dict

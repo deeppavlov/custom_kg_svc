@@ -18,7 +18,7 @@ def create_kind_node(kind: str, node_dict: dict):
     db.cypher_query(query, node_dict)
 
 
-def search_nodes(kind: str, node_dict: dict = None, limit=10) -> list:
+def search_nodes(kind: str, node_dict: Optional[dict] = None, limit=10) -> list:
     """Search existing nodes
 
     :param kind: node kind
@@ -26,7 +26,8 @@ def search_nodes(kind: str, node_dict: dict = None, limit=10) -> list:
     :param limit: maximum # nodes returned
     :return: neo4j nodes list
     """
-    node_dict = node_dict or {}
+    if node_dict is None:
+        node_dict = {}
     match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
     return_ = f"RETURN a\n LIMIT {limit}"
     query = "\n".join([match_a, return_])
@@ -35,7 +36,7 @@ def search_nodes(kind: str, node_dict: dict = None, limit=10) -> list:
     return nodes
 
 
-def update_node(kind: str, updates: dict, filter_node: dict = None):
+def update_node(kind: str, updates: dict, filter_node: Optional[dict] = None):
     """Update a node properties
 
     :param kind: node kind
@@ -43,7 +44,8 @@ def update_node(kind: str, updates: dict, filter_node: dict = None):
     :param updates: new properties and updated properties
     :return:
     """
-    filter_node = filter_node or {}
+    if filter_node is None:
+        filter_node = {}
     nodes = search_nodes(kind, filter_node)
     if len(nodes)==1: # we need to update exactly one node
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
@@ -100,11 +102,11 @@ def create_relationship(
 
 def search_relationships(
     relationship: str,
-    filter_dict: dict = None,
+    filter_dict: Optional[dict] = None,
     kind_a: str = "",
-    filter_a: dict = None,
+    filter_a: Optional[dict] = None,
     kind_b: str = "",
-    filter_b: dict = None,
+    filter_b: Optional[dict] = None,
     limit=10,
     programmer=0,
 ) -> list:
@@ -121,9 +123,12 @@ def search_relationships(
                         True for returning query, params of matching that relationship.
     :return: neo4j relationships list
     """
-    filter_dict = filter_dict or {}
-    filter_a = filter_a or {}
-    filter_b = filter_b or {}
+    if filter_dict is None:
+        filter_dict = {}
+    if filter_a is None:
+        filter_a = {}
+    if filter_b is None:
+        filter_b = {}
     node_a_query, node_b_query = [""] * 2
     if kind_a:
         node_a_query, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
@@ -179,11 +184,11 @@ def update_relationship(
 
 def delete_relationship(
     relationship: str,
-    filter_rel: dict = None,
+    filter_rel: Optional[dict] = None,
     kind_a: str = "",
-    filter_a: dict = None,
+    filter_a: Optional[dict] = None,
     kind_b: str = "",
-    filter_b: dict = None,
+    filter_b: Optional[dict] = None,
 ):
     """Delete a relationship between two nodes A and B
     :param relationship: relationship type
@@ -194,9 +199,12 @@ def delete_relationship(
     :param filter_b: node B match filter
     :return:
     """
-    filter_rel = filter_rel or {}
-    filter_a = filter_a or {}
-    filter_b = filter_b or {}
+    if filter_a is None:
+        filter_a = {}
+    if filter_b is None:
+        filter_b = {}
+    if filter_rel is None:
+        filter_rel = {}
     match_relationship, params = search_relationships(
         relationship, filter_rel, kind_a, filter_a, kind_b, filter_b, programmer=1
     )
