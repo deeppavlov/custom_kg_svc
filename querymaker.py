@@ -44,7 +44,6 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
     :return: query string, disambiguated parameters dict (parameter keys are renamed from {key} to {key}_{var_name})
     """
     var_name = sanitize_alphanumeric(var_name)
-    kind = sanitize_alphanumeric(kind)
     filter_dict = sanitize_dict_keys(filter_dict)
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict.keys())
