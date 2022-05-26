@@ -19,11 +19,10 @@ def sanitize_dict_keys(input_value: dict):
     return {sanitize_alphanumeric(k): v for k, v in input_value.items()}
 
 
-def merge_node_query(
+def init_node_query(
     kind: str, immutable_properties: dict, state_properties: dict, create_date: datetime.datetime
 ) -> str:
-    """Prepare and sanitize MERGE CYPHER query for node creation.
-    Should be used together with match_query.
+    """Prepare and sanitize graph.versioner.init CYPHER query for node creation.
 
     :param kind: node kind
     :param immutable_properties: A Map representing the Entity immutable properties.
@@ -71,7 +70,7 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
     return query, updated_filter_dict
 
 
-def set_property_query(
+def patch_property_query(
     var_name: str, properties_dict: dict, change_date: datetime.datetime, additional_label: str = ""
 ):
     """Prepare and sanitize graph.versioner.patch CYPHER query.
@@ -104,14 +103,14 @@ def set_property_query(
     return query, updated_filter_dict
 
 
-def merge_relationship_query(
+def create_relationship_query(
     var_name_a: str,
     relationship: str,
     rel_dict: dict,
     var_name_b: str,
     create_date: datetime.datetime,
 ) -> str:
-    """Prepare and sanitize MERGE CYPHER query for relationship creation.
+    """Prepare and sanitize graph.versioner.relationship.create CYPHER query for relationship creation.
     Should be used together with match_query.
 
     :param var_name_a: variable name which CYPHER will use to identify the first node match
@@ -161,7 +160,7 @@ def match_relationship_query(
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict)
     updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
-    query = query = (f"MATCH (source)-[:HAS_STATE]->"
+    query = (f"MATCH (source)-[:HAS_STATE]->"
              f"({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->"
              f"({var_name_b})-[:FOR]->(destination)")
     return query, updated_filter_dict
@@ -197,6 +196,8 @@ def delete_relationship_query(
 
 def delete_query(var_name, node=True):
     """Prepare DELETE CYPHER query for nodes and relationships.
+    Should be used together with match_query.
+
     :params var_name: variable name which CYPHER will use to identify the match
     :params node: True for deleting nodes, False for relationships
     :return: query string
