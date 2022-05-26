@@ -5,36 +5,54 @@ import graph
 
 TEST_USER_ENTITIES = [
     {
-        "name": "Jack Ryan",
-        "born": datetime.strptime("1980-06-30", "%Y-%m-%d"),
-        "oceanTraits": ["Openness", "Conscientiousness", "Agreeableness"],
+        "immutable": {
+            "name": "Jack Ryan",
+        },
+        "mutable": {
+            "born": datetime.strptime("1980-06-30", "%Y-%m-%d"),
+            "OCEAN_openness": True,
+            "OCEAN_conscientiousness": True,
+            "OCEAN_agreeableness": True,
+            "OCEAN_neuroticism": False,
+            "OCEAN_extraversion": False,
+        },
     },
     {
-        "name": "Sandy Bates",
-        "born": "1998-04-10",
-        "oceanTraits": ["Openness", "Extraversion", "Neuroticism"],
+        "immutable": {
+            "name": "Sandy Bates",
+        },
+        "mutable": {
+            "born": "1998-04-10",
+            "OCEAN_openness": True,
+            "OCEAN_conscientiousness": False,
+            "OCEAN_agreeableness": False,
+            "OCEAN_neuroticism": True,
+            "OCEAN_extraversion": True,
+        },
     },
 ]
 
-TEST_BOT_ENTITIES = [{"name": "ChatBot", "born": "2020-03-02"}]
+TEST_BOT_ENTITIES = [
+    {"immutable": {"name": "ChatBot"}, "mutable": {"born": "2020-03-02"}}
+]
 
 TEST_INTEREST_ENTITIES = [
-    {"name": "Theater"},
-    {"name": "Artificial Intelligence"},
-    {"name": "Sport"},
-    {"name": "Mindfulness"},
-    {"name": "Medicine"},
+    {"immutable": {"name": "Theater"}, "mutable": {}},
+    {"immutable": {"name": "Artificial Intelligence"}, "mutable": {}},
+    {"immutable": {"name": "Sport"}, "mutable": {}},
+    {"immutable": {"name": "Mindfulness"}, "mutable": {}},
+    {"immutable": {"name": "Medicine"}, "mutable": {}},
 ]
 
 TEST_HABIT_ENTITIES = [
-    {"name": "Reading", "label": "Good"},
-    {"name": "Yoga", "label": "Good"},
-    {"name": "Alcohol", "label": "Bad"},
-    {"name": "Smoking", "label": "Bad"},
-    {"name": "Dancing"},
+    {"immutable": {"name": "Reading"}, "mutable": {"label": "Good"}},
+    {"immutable": {"name": "Yoga"}, "mutable": {"label": "Good"}},
+    {"immutable": {"name": "Alcohol"}, "mutable": {"label": "Bad"}},
+    {"immutable": {"name": "Smoking"}, "mutable": {"label": "Bad"}},
+    {"immutable": {"name": "Dancing"}, "mutable": {}},
 ]
 
-TEST_DISEASE_ENTITIES = [{"name": "Cancer"}]
+TEST_DISEASE_ENTITIES = [{"immutable": {"name": "Cancer"}, "mutable": {}}]
 
 TEST_ENTITIES = {
     "User": TEST_USER_ENTITIES,
@@ -79,7 +97,9 @@ def test_populate(drop=True):
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
-            graph.create_kind_node(kind, entity_dict)
+            graph.create_kind_node(
+                kind, entity_dict["immutable"], entity_dict["mutable"]
+            )
 
     for kind_a, filter_a, rel, rel_dict, kind_b, filter_b in TEST_MATCHES:
         graph.create_relationship(kind_a, filter_a, rel, rel_dict, kind_b, filter_b)
@@ -116,10 +136,10 @@ def test_search():
         print("\n", key)
         for habit in value:
             print(
-                habit[1].start_node._properties["name"],
+                habit[0]._properties["name"],
                 habit[1].type,
                 habit[1]._properties,
-                habit[1].end_node._properties["name"],
+                habit[2]._properties["name"],
             )
 
 
@@ -130,14 +150,18 @@ def test_update():
     graph.update_node("User", {"country": "Russia"})
     # Sandy does all her habits every Friday
     graph.update_relationship(
-        "KEEPS_UP", {"every": "Friday"}, kind_a="User", filter_a={"name": "Sandy Bates"}
+        "KEEPS_UP",
+        {"every": "Friday"},
+        kind_a="User",
+        kind_b="Habit",
+        filter_a={"name": "Sandy Bates"},
     )
     # Sandy started to do her habits, which are since March, as daily routine
     graph.update_relationship(
         "KEEPS_UP",
         updates={"every": "day"},
-        filter_rel={"since": "March"},
         kind_a="User",
+        kind_b="Habit",
         filter_a={"name": "Sandy Bates"},
     )
     graph.update_relationship(
@@ -158,7 +182,7 @@ def test_delete():
         kind_b="Habit",
         filter_b={"name": "Dancing"},
     )
-    graph.delete_node("User", {"name": "Jay Ryan"}, completely=1)
+    graph.delete_node("User", {"name": "Jack Ryan"}, completely=False)
 
 
 test_populate()
