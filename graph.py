@@ -23,7 +23,7 @@ def create_kind_node(
     :param create_date: node creation date
     :return:
     """
-    query = querymaker.merge_node_query(
+    query = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
     )
     node_dict = {**immutable_properties, **state_properties}
@@ -68,7 +68,7 @@ def update_node(
     if len(nodes)==1: # we need to update exactly one node
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
         with_ = querymaker.with_query(["a"])
-        set_query, updated_updates = querymaker.set_property_query(
+        set_query, updated_updates = querymaker.patch_property_query(
             "a", updates, change_date
         )
         params = {**filter_node, **updated_updates}
@@ -122,7 +122,7 @@ def create_relationship(
     """
     match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
-    rel = querymaker.merge_relationship_query(
+    rel = querymaker.create_relationship_query(
         "a", relationship, rel_dict, "b", create_date
     )
     with_ = querymaker.with_query(["a", "b"])
