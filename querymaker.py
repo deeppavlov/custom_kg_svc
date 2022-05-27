@@ -217,8 +217,8 @@ def with_query(var_names: list) -> str:
     :return: query string
     """
     query = "WITH "
-    for var_name in var_names:
-        var_name = sanitize_alphanumeric(var_name)
-        query += var_name + ", "
-    query = query[:-2]
+    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    var_names_str = ", ".join(var_names)
+
+    query = query + var_names_str
     return query
