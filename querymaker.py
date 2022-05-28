@@ -1,6 +1,7 @@
 from typing import Tuple
 import datetime
 
+
 def sanitize_alphanumeric(input_value: str):
     """Remove characters which are not letters, numbers or underscore
 
@@ -20,7 +21,10 @@ def sanitize_dict_keys(input_value: dict):
 
 
 def init_node_query(
-    kind: str, immutable_properties: dict, state_properties: dict, create_date: datetime.datetime
+    kind: str,
+    immutable_properties: dict,
+    state_properties: dict,
+    create_date: datetime.datetime,
 ) -> str:
     """Prepare and sanitize graph.versioner.init CYPHER query for node creation.
 
@@ -71,7 +75,10 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
 
 
 def patch_property_query(
-    var_name: str, properties_dict: dict, change_date: datetime.datetime, additional_label: str = ""
+    var_name: str,
+    properties_dict: dict,
+    change_date: datetime.datetime,
+    additional_label: str = "",
 ):
     """Prepare and sanitize graph.versioner.patch CYPHER query.
     Should be used together with match_query.
@@ -160,11 +167,12 @@ def match_relationship_query(
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict)
     updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
-    query = (f"MATCH (source)-[:HAS_STATE]->"
-             f"({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->"
-             f"({var_name_b})-[:FOR]->(destination)")
+    query = (
+        f"MATCH (source)-[:HAS_STATE]->"
+        f"({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->"
+        f"({var_name_b})-[:FOR]->(destination)"
+    )
     return query, updated_filter_dict
-
 
 
 def delete_relationship_query(
