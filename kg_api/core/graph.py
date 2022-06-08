@@ -1,8 +1,8 @@
 from typing import Optional
 import datetime
 from neomodel import db, config, clear_neo4j_database
-from settings import OntologySettings
-import querymaker
+from kg_api.utils.settings import OntologySettings
+import kg_api.core.querymaker as querymaker
 
 
 def drop_database():

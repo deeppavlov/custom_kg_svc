@@ -1,6 +1,6 @@
 from datetime import datetime
 
-import graph
+import kg_api.core.graph as graph
 
 
 TEST_USER_ENTITIES = [

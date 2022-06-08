@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import datetime
-from generate_data import (
+from kg_api.utils.generate_data import (
     fake_update,
     generic,
     iterate_generate_1node_and_1rel,
     generate_specific_amount_of_data,
     set_date,
 )
-import graph
+import kg_api.core.graph as graph
 
 NUM_USERS = 1
 NUM_ENTITIES = 3
