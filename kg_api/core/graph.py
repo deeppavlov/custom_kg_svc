@@ -14,7 +14,7 @@ def create_kind_node(
     kind: str,
     immutable_properties: dict,
     state_properties: dict,
-    create_date: datetime.datetime = datetime.datetime.now(),
+    create_date: Optional[datetime.datetime] = None,
 ):
     """Create new node.
 
@@ -27,6 +27,8 @@ def create_kind_node(
     Returns:
 
     """
+    if create_date is None:
+        create_date = datetime.datetime.now()
     query = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
     )
@@ -60,7 +62,7 @@ def update_node(
     kind: str,
     updates: dict,
     filter_node: Optional[dict] = None,
-    change_date: datetime.datetime = datetime.datetime.now(),
+    change_date: Optional[datetime.datetime] = None,
 ):
     """Update a node properties.
 
@@ -75,6 +77,9 @@ def update_node(
     """
     if filter_node is None:
         filter_node = {}
+    if change_date is None:
+        change_date = datetime.datetime.now()
+
     nodes = search_nodes(kind, filter_node)
     if len(nodes) == 1:  # we need to update exactly one node
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
@@ -91,7 +96,7 @@ def delete_node(
     kind: str,
     node_dict: dict,
     completely=False,
-    deletion_date: datetime.datetime = datetime.datetime.now(),
+    deletion_date: Optional[datetime.datetime] = None,
 ):
     """Delete a node completely from database or make it a thing of the past.
 
@@ -106,6 +111,8 @@ def delete_node(
     Returns:
 
     """
+    if deletion_date is None:
+        deletion_date = datetime.datetime.now()
     if completely:
         match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
         delete_a = querymaker.delete_query("a")
@@ -115,7 +122,7 @@ def delete_node(
 
         db.cypher_query(query, params)
     else:
-        update_node(kind, {"deleted": True}, node_dict, deletion_date)
+        update_node(kind, {"_deleted": True}, node_dict, deletion_date)
 
 
 def create_relationship(
@@ -125,7 +132,7 @@ def create_relationship(
     rel_dict: dict,
     kind_b: str,
     filter_b: dict,
-    create_date: datetime.datetime = datetime.datetime.now(),
+    create_date: Optional[datetime.datetime] = None,
 ):
     """Find nodes A and B and set a relationship between them.
 
@@ -140,6 +147,8 @@ def create_relationship(
     Returns:
 
     """
+    if create_date is None:
+        create_date = datetime.datetime.now()
     match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
     rel = querymaker.create_relationship_query(
@@ -213,7 +222,7 @@ def update_relationship(
     kind_b: str,
     filter_a: Optional[dict] = None,
     filter_b: Optional[dict] = None,
-    change_date: datetime.datetime = datetime.datetime.now(),
+    change_date: Optional[datetime.datetime] = None,
 ):
     """Update a relationship properties.
 
@@ -237,6 +246,8 @@ def update_relationship(
         filter_a = {}
     if filter_b is None:
         filter_b = {}
+    if change_date is None:
+        change_date = datetime.datetime.now()
 
     delete_relationship(
         relationship, kind_a, kind_b, filter_a, filter_b, deletion_date=change_date
@@ -259,7 +270,7 @@ def delete_relationship(
     filter_a: Optional[dict] = None,
     filter_b: Optional[dict] = None,
     completely: bool = False,
-    deletion_date: datetime.datetime = datetime.datetime.now(),
+    deletion_date: Optional[datetime.datetime] = None,
 ):
     """Delete a relationship between two nodes A and B.
 
@@ -281,6 +292,8 @@ def delete_relationship(
         filter_a = {}
     if filter_b is None:
         filter_b = {}
+    if deletion_date is None:
+        deletion_date = datetime.datetime.now()
 
     if completely:
         match_relationship, params = search_relationships(
