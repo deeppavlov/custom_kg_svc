@@ -96,16 +96,28 @@ relationship_properties = Schema(schema=lambda: {"sometimes": fabulist.get_word(
 
 
 def set_date(date):
+    """Initiate the global vaiable date
+
+    Args:
+      date: the desired initial date of generated data
+
+    Returns:
+
+    """
     global _date
     _date = date
 
 
 def generate_rels(iterations: int, nodes: dict) -> list:
-    """Generate random relationships using the rels schema, then add start and end nodes to it
+    """Generate random relationships using the rels schema, then add start and end nodes to it.
 
-    :params iterations: number of relationships to generate
-    :params nodes: nodes in database
-    :return: generated relationships
+    Args:
+      iterations: number of relationships to generate
+      nodes: nodes in database
+
+    Returns:
+      generated relationships
+
     """
     relationships = rels.create(iterations)
     nodes_ids = [key for key in nodes]
@@ -127,9 +139,13 @@ def iterate_generate_1node_and_1rel(
         Add generated node and rel to database as well as to local variables so that
         they can be used in future linking
 
-    :params nodes: nodes in database
-    :params relationships: relationships in database
-    :return: modified nodes and relationships after assigning the generated ones
+    Args:
+      nodes: nodes in database
+      relationships: relationships in database
+
+    Returns:
+      modified nodes and relationships after assigning the generated ones
+
     """
     global _date
     while True:
@@ -177,11 +193,16 @@ def fake_update(
     """Update the database with new relationships and entities, as well as
         updating existing ones by adding properties
 
-    :params nodes: nodes in database
-    :params relationships: relationships in database
-    :params updates_interval: the number of years during which the changes were made
-    :params n_updates: the number of changes we want to make on the fake-database
-    :return: modified nodes and relationships after assigning the generated ones
+    Args:
+      generator: one-node-and-one-relationship generator
+      nodes: nodes in database
+      relationships: relationships in database
+      n_updates: the number of changes we want to make on the fake-database
+      updates_interval: the number of years during which the changes were made
+
+    Returns:
+      modified nodes and relationships after assigning the generated ones
+
     """
     global _date
     for _ in range(n_updates):
@@ -223,12 +244,15 @@ def generate_specific_amount_of_data(
 ) -> Tuple[dict, list]:
     """Generate new entities and relationships and add them to database
 
-    :params num_users: number of users to generate
-    :params num_entities: number of random entities to generate
-    :params num_relationships: number of random relationships to generate
-    :params interval_in_days: the period, after which the next change happens
+    Args:
+      num_users: number of users to generate
+      num_entities: number of random entities to generate
+      num_relationships: number of random relationships to generate
+      interval_in_days: the period, after which the next change happens
 
-    :return: generated nodes and relationships
+    Returns:
+      generated nodes and relationships
+
     """
     global _date
 

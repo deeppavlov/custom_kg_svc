@@ -5,8 +5,11 @@ import datetime
 def sanitize_alphanumeric(input_value: str):
     """Remove characters which are not letters, numbers or underscore
 
-    :param input_value: raw string
-    :return:
+    Args:
+      input_value: raw string
+
+    Returns:
+
     """
     return "".join(char for char in input_value if char.isalnum() or char == "_")
 
@@ -14,8 +17,11 @@ def sanitize_alphanumeric(input_value: str):
 def sanitize_dict_keys(input_value: dict):
     """Remove characters which are not letters, numbers or underscore from dictionary keys
 
-    :param input_value: raw dictionary
-    :return:
+    Args:
+      input_value: raw dictionary
+
+    Returns:
+
     """
     return {sanitize_alphanumeric(k): v for k, v in input_value.items()}
 
@@ -28,11 +34,15 @@ def init_node_query(
 ) -> str:
     """Prepare and sanitize graph.versioner.init CYPHER query for node creation.
 
-    :param kind: node kind
-    :param immutable_properties: A Map representing the Entity immutable properties.
-    :param state_properties: A Map representing the Entity state properties (mutable).
-    :param create_date: node creation date
-    :return: query string
+    Args:
+      kind: node kind
+      immutable_properties: A Map representing the Entity immutable properties.
+      state_properties: A Map representing the Entity state properties (mutable).
+      create_date: node creation date
+
+    Returns:
+      query string
+
     """
     kind = sanitize_alphanumeric(kind)
     immutable_properties = sanitize_dict_keys(immutable_properties)
@@ -56,10 +66,15 @@ def init_node_query(
 def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]:
     """Prepare and sanitize MATCH CYPHER query for nodes.
 
-    :param var_name: variable name which CYPHER will use to identify the match
-    :param kind: node kind
-    :param filter_dict: node keyword arguments for matching
-    :return: query string, disambiguated parameters dict (parameter keys are renamed from {key} to {key}_{var_name})
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      kind: node kind
+      filter_dict: node keyword arguments for matching
+
+    Returns:
+      query string, disambiguated parameters dict (parameter keys are
+      renamed from {key} to {key}_{var_name})
+
     """
     var_name = sanitize_alphanumeric(var_name)
     filter_dict = sanitize_dict_keys(filter_dict)
@@ -83,11 +98,15 @@ def patch_property_query(
     """Prepare and sanitize graph.versioner.patch CYPHER query.
     Should be used together with match_query.
 
-    :params var_name: variable name which CYPHER will use to identify the match
-    :params properties_dict: the property label to be updated
-    :params change_date: the date of making change
-    :params additional_label: The name of an additional Label to the new State
-    :return: query string, disambiguated property label
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      properties_dict: the property label to be updated
+      change_date: the date of making change
+      additional_label: The name of an additional Label to the new State
+
+    Returns:
+      query string, disambiguated property label
+
     """
     var_name = sanitize_alphanumeric(var_name)
     additional_label = sanitize_alphanumeric(additional_label)
@@ -117,14 +136,19 @@ def create_relationship_query(
     var_name_b: str,
     create_date: datetime.datetime,
 ) -> str:
-    """Prepare and sanitize graph.versioner.relationship.create CYPHER query for relationship creation.
+    """Prepare and sanitize graph.versioner.relationship.create CYPHER query for
+       relationship creation.
     Should be used together with match_query.
 
-    :param var_name_a: variable name which CYPHER will use to identify the first node match
-    :param relationship: kind of relationship
-    :param var_name_b: variable name which CYPHER will use to identify the second node match
-    :param create_date: relationship creation date
-    :return: query string
+    Args:
+      var_name_a: variable name which CYPHER will use to identify the first node match
+      relationship: kind of relationship
+      var_name_b: variable name which CYPHER will use to identify the second node match
+      create_date: relationship creation date
+
+    Returns:
+      query string
+
     """
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
@@ -154,12 +178,17 @@ def match_relationship_query(
 ) -> Tuple[str, dict]:
     """Prepare and sanitize MATCH CYPHER query for relationships.
 
-    :param var_name: variable name which CYPHER will use to identify the relationship match
-    :param var_name_a: variable name which CYPHER will use to identify the first node match
-    :param var_name_b: variable name which CYPHER will use to identify the second node match
-    :param relationship: relationship type
-    :param filter_dict: relationship keyword arguments for matching
-    :return: query string, disambiguated parameters dict (parameter keys are renamed from {key} to {key}_{var_name})
+    Args:
+      var_name: variable name which CYPHER will use to identify the relationship match
+      var_name_a: variable name which CYPHER will use to identify the first node match
+      var_name_b: variable name which CYPHER will use to identify the second node match
+      relationship: relationship type
+      filter_dict: relationship keyword arguments for matching
+
+    Returns:
+      query string, disambiguated parameters dict (parameter keys are
+      renamed from {key} to {key}_{var_name})
+
     """
     var_name = sanitize_alphanumeric(var_name)
     relationship = sanitize_alphanumeric(relationship)
@@ -178,14 +207,19 @@ def match_relationship_query(
 def delete_relationship_query(
     var_name_a: str, relationship: str, var_name_b: str, change_date: datetime.datetime
 ) -> str:
-    """Prepare and sanitize graph.versioner.relationship.delete CYPHER query for relationship deletion.
+    """Prepare and sanitize graph.versioner.relationship.delete CYPHER query for
+       relationship deletion.
     Should be used together with match_query.
 
-    :param var_name_a: variable name which CYPHER will use to identify the first node match
-    :param relationship: kind of relationship
-    :param var_name_b: variable name which CYPHER will use to identify the second node match
-    :params change_date: the date of relationship deletion
-    :return: query string
+    Args:
+      var_name_a: variable name which CYPHER will use to identify the first node match
+      relationship: kind of relationship
+      var_name_b: variable name which CYPHER will use to identify the second node match
+      change_date: the date of relationship deletion
+
+    Returns:
+      query string
+
     """
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
@@ -206,9 +240,13 @@ def delete_query(var_name, node=True):
     """Prepare DELETE CYPHER query for nodes and relationships.
     Should be used together with match_query.
 
-    :params var_name: variable name which CYPHER will use to identify the match
-    :params node: True for deleting nodes, False for relationships
-    :return: query string
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      node: True for deleting nodes, False for relationships
+
+    Returns:
+      query string
+
     """
     var_name = sanitize_alphanumeric(var_name)
     query = f"DELETE {var_name}"
@@ -221,8 +259,12 @@ def with_query(var_names: list) -> str:
     """Prepare WITH CYPHER query to chain queries togther
     Should be used together with match_query.
 
-    :params var_names: list of variable names to pipe to the next query
-    :return: query string
+    Args:
+      var_names: list of variable names to pipe to the next query
+
+    Returns:
+      query string
+
     """
     query = "WITH "
     var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]

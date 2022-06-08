@@ -6,6 +6,7 @@ import kg_api.core.querymaker as querymaker
 
 
 def drop_database():
+    """Clear database."""
     clear_neo4j_database(db)
 
 
@@ -15,13 +16,16 @@ def create_kind_node(
     state_properties: dict,
     create_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Create new node
+    """Create new node.
 
-    :param kind: node kind
-    :param immutable_properties: A Map representing the Entity immutable properties.
-    :param state_properties: A Map representing the Entity state properties (mutable).
-    :param create_date: node creation date
-    :return:
+    Args:
+      kind: node kind
+      immutable_properties: A Map representing the Entity immutable properties.
+      state_properties: A Map representing the Entity state properties (mutable).
+      create_date: node creation date
+
+    Returns:
+
     """
     query = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
@@ -31,12 +35,16 @@ def create_kind_node(
 
 
 def search_nodes(kind: str, node_dict: Optional[dict] = None, limit=10) -> list:
-    """Search existing nodes
+    """Search existing nodes.
 
-    :param kind: node kind
-    :param node_dict: node params
-    :param limit: maximum # nodes returned
-    :return: neo4j nodes list
+    Args:
+      kind: node kind
+      node_dict: node params
+      limit: maximum number of returned nodes
+
+    Returns:
+      neo4j nodes list
+
     """
     if node_dict is None:
         node_dict = {}
@@ -54,18 +62,21 @@ def update_node(
     filter_node: Optional[dict] = None,
     change_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Update a node properties
+    """Update a node properties.
 
-    :param kind: node kind
-    :param filter_node: node match filter
-    :param updates: new properties and updated properties
-    :params change_date: the date of node updating
-    :return:
+    Args:
+      kind: node kind
+      filter_node: node match filter
+      updates: new properties and updated properties
+      change_date: the date of node updating
+
+    Returns:
+
     """
     if filter_node is None:
         filter_node = {}
     nodes = search_nodes(kind, filter_node)
-    if len(nodes)==1: # we need to update exactly one node
+    if len(nodes) == 1:  # we need to update exactly one node
         match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
         with_ = querymaker.with_query(["a"])
         set_query, updated_updates = querymaker.patch_property_query(
@@ -82,12 +93,18 @@ def delete_node(
     completely=False,
     deletion_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Delete a node completely from database or make it in the past
-    :param kind: node kind
-    :param node_dict: node params
-    :param completely: if True, then the node will be deleted completely
-                        from DB with all its relationships
-    :params deletion_date: the date of node deletion
+    """Delete a node completely from database or make it a thing of the past.
+
+    Args:
+      kind: node kind
+      node_dict: node params
+      completely: if True, then the node will be deleted completely from DB
+                  with all its relationships. If False, the node will be marked
+                  as deleted by the _deleted property.
+      deletion_date: the date of node deletion
+
+    Returns:
+
     """
     if completely:
         match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
@@ -110,15 +127,18 @@ def create_relationship(
     filter_b: dict,
     create_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Find nodes A and B and set a relationship between them
+    """Find nodes A and B and set a relationship between them.
 
-    :param kind_a: node A kind
-    :param filter_a: node A match filter
-    :param relationship: relationship between nodes A and B
-    :param kind_b: node B kind
-    :param filter_b: node B match filter
-    :param create_date: relationship creation date
-    :return:
+    Args:
+      kind_a: node A kind
+      filter_a: node A match filter
+      relationship: relationship between nodes A and B
+      kind_b: node B kind
+      filter_b: node B match filter
+      create_date: relationship creation date
+
+    Returns:
+
     """
     match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
@@ -142,18 +162,22 @@ def search_relationships(
     limit=10,
     programmer=0,
 ) -> list:
-    """Search existing relationships
+    """Search existing relationships.
 
-    :param relationship: relationship type
-    :param filter_dict: relationship params
-    :param kind_a: node A kind
-    :param filter_a: node A match filter
-    :param kind_b: node B kind
-    :param filter_b: node B match filter
-    :param limit: maximum # nodes returned
-    :param programmer: False for returning the relationship found.
-                        True for returning query, params of matching that relationship.
-    :return: neo4j relationships list
+    Args:
+      relationship: relationship type
+      filter_dict: relationship params
+      kind_a: node A kind
+      filter_a: node A match filter
+      kind_b: node B kind
+      filter_b: node B match filter
+      limit: maximum # nodes returned
+      programmer: False for returning the relationship found. True for returning
+                  (query, params) of that relationship matching.
+
+    Returns:
+      neo4j relationships list
+
     """
     if filter_dict is None:
         filter_dict = {}
@@ -191,16 +215,19 @@ def update_relationship(
     filter_b: Optional[dict] = None,
     change_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Update a relationship properties
+    """Update a relationship properties.
 
-    :param relationship: relationship type
-    :param updates: new properties and updated properties
-    :param kind_a: node A kind
-    :param filter_a: node A match filter
-    :param kind_b: node B kind
-    :param filter_b: node B match filter
-    :params change_date: the date of node updating
-    :return:
+    Args:
+      relationship: relationship type
+      updates: new properties and updated properties
+      kind_a: node A kind
+      filter_a: node A match filter
+      kind_b: node B kind
+      filter_b: node B match filter
+      change_date: the date of node updating
+
+    Returns:
+
     """
     # - It seems that it's not recommended to update relationship properties, as there is no
     #   special function for doing that in the versioner.
@@ -234,13 +261,21 @@ def delete_relationship(
     completely: bool = False,
     deletion_date: datetime.datetime = datetime.datetime.now(),
 ):
-    """Delete a relationship between two nodes A and B
-    :param relationship: relationship type
-    :param kind_a: node A kind
-    :param filter_a: node A match filter
-    :param kind_b: node B kind
-    :param filter_b: node B match filter
-    :return:
+    """Delete a relationship between two nodes A and B.
+
+    Args:
+      relationship: relationship type
+      kind_a: node A kind
+      filter_a: node A match filter
+      kind_b: node B kind
+      filter_b: node B match filter
+      completely: if True, then the relationship will be deleted completely
+                  from DB. If False, a new state node will be created via the versioner
+                  to indicate a new state without the deleted relationship.
+      deletion_date: the date of relationship deletion
+
+    Returns:
+
     """
     if filter_a is None:
         filter_a = {}
