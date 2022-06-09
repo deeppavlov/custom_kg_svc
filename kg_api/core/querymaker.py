@@ -3,7 +3,7 @@ import datetime
 
 
 def sanitize_alphanumeric(input_value: str):
-    """Remove characters which are not letters, numbers or underscore
+    """Removes characters which are not letters, numbers or underscore.
 
     Args:
       input_value: raw string
@@ -15,7 +15,7 @@ def sanitize_alphanumeric(input_value: str):
 
 
 def sanitize_dict_keys(input_value: dict):
-    """Remove characters which are not letters, numbers or underscore from dictionary keys
+    """Removes characters which are not letters, numbers or underscore from dictionary keys.
 
     Args:
       input_value: raw dictionary
@@ -32,7 +32,7 @@ def init_node_query(
     state_properties: dict,
     create_date: datetime.datetime,
 ) -> str:
-    """Prepare and sanitize graph.versioner.init CYPHER query for node creation.
+    """Prepares and sanitizes graph.versioner.init CYPHER query for node creation.
 
     Args:
       kind: node kind
@@ -64,7 +64,7 @@ def init_node_query(
 
 
 def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]:
-    """Prepare and sanitize MATCH CYPHER query for nodes.
+    """Prepares and sanitizes MATCH CYPHER query for nodes.
 
     Args:
       var_name: variable name which CYPHER will use to identify the match
@@ -95,7 +95,8 @@ def patch_property_query(
     change_date: datetime.datetime,
     additional_label: str = "",
 ):
-    """Prepare and sanitize graph.versioner.patch CYPHER query.
+    """Prepares and sanitizes graph.versioner.patch CYPHER query.
+
     Should be used together with match_query.
 
     Args:
@@ -136,8 +137,9 @@ def create_relationship_query(
     var_name_b: str,
     create_date: datetime.datetime,
 ) -> str:
-    """Prepare and sanitize graph.versioner.relationship.create CYPHER query for
-       relationship creation.
+    """Prepares and sanitizes versioner's create CYPHER query for relationship creation.
+    
+    The versioner's create query is graph.versioner.relationship.create.
     Should be used together with match_query.
 
     Args:
@@ -176,7 +178,7 @@ def match_relationship_query(
     filter_dict: dict,
     var_name_b: str,
 ) -> Tuple[str, dict]:
-    """Prepare and sanitize MATCH CYPHER query for relationships.
+    """Prepares and sanitizes MATCH CYPHER query for relationships.
 
     Args:
       var_name: variable name which CYPHER will use to identify the relationship match
@@ -207,8 +209,9 @@ def match_relationship_query(
 def delete_relationship_query(
     var_name_a: str, relationship: str, var_name_b: str, change_date: datetime.datetime
 ) -> str:
-    """Prepare and sanitize graph.versioner.relationship.delete CYPHER query for
-       relationship deletion.
+    """Prepares and sanitizes versioner's delete CYPHER query for relationship deletion.
+    
+    The versioner's delete query is graph.versioner.relationship.delete.
     Should be used together with match_query.
 
     Args:
@@ -237,7 +240,8 @@ def delete_relationship_query(
 
 
 def delete_query(var_name, node=True):
-    """Prepare DELETE CYPHER query for nodes and relationships.
+    """Prepares DELETE CYPHER query for nodes and relationships.
+    
     Should be used together with match_query.
 
     Args:
@@ -256,7 +260,8 @@ def delete_query(var_name, node=True):
 
 
 def with_query(var_names: list) -> str:
-    """Prepare WITH CYPHER query to chain queries togther
+    """Prepares WITH CYPHER query to chain queries togther
+    
     Should be used together with match_query.
 
     Args:

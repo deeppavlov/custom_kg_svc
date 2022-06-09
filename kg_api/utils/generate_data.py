@@ -96,7 +96,7 @@ relationship_properties = Schema(schema=lambda: {"sometimes": fabulist.get_word(
 
 
 def set_date(date):
-    """Initiate the global vaiable date
+    """Initializes the global vaiable date
 
     Args:
       date: the desired initial date of generated data
@@ -109,7 +109,9 @@ def set_date(date):
 
 
 def generate_rels(iterations: int, nodes: dict) -> list:
-    """Generate random relationships using the rels schema, then add start and end nodes to it.
+    """Generates relationships.
+
+    Generates random relationships using the rels schema, then adds start and end nodes to it.
 
     Args:
       iterations: number of relationships to generate
@@ -135,8 +137,10 @@ def iterate_generate_1node_and_1rel(
     nodes: dict,
     relationships: list,
 ) -> Generator:
-    """Generate one node and one relationship that links the node with others.
-        Add generated node and rel to database as well as to local variables so that
+    """Method 1 to generate data.
+
+    Generates one node and one relationship that links the node with others.
+    Adds generated node and rel to database as well as to local variables so that
         they can be used in future linking
 
     Args:
@@ -190,8 +194,9 @@ def fake_update(
     n_updates: int,
     interval_in_days: datetime.timedelta,
 ) -> Tuple[dict, list]:
-    """Update the database with new relationships and entities, as well as
-        updating existing ones by adding properties
+    """Updates the database.
+
+    Adds new relationships and entities & updates existing ones by adding properties.
 
     Args:
       generator: one-node-and-one-relationship generator
@@ -242,7 +247,9 @@ def fake_update(
 def generate_specific_amount_of_data(
     num_users, num_entities, num_relationships, interval_in_days
 ) -> Tuple[dict, list]:
-    """Generate new entities and relationships and add them to database
+    """Method 2 to generate data.
+
+    Generates specific number of: user entities, other random entities, and relationships.
 
     Args:
       num_users: number of users to generate

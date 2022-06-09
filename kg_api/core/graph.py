@@ -6,7 +6,7 @@ import kg_api.core.querymaker as querymaker
 
 
 def drop_database():
-    """Clear database."""
+    """Clears database."""
     clear_neo4j_database(db)
 
 
@@ -16,7 +16,7 @@ def create_kind_node(
     state_properties: dict,
     create_date: Optional[datetime.datetime] = None,
 ):
-    """Create new node.
+    """Creates new node.
 
     Args:
       kind: node kind
@@ -37,7 +37,7 @@ def create_kind_node(
 
 
 def search_nodes(kind: str, node_dict: Optional[dict] = None, limit=10) -> list:
-    """Search existing nodes.
+    """Searches existing nodes.
 
     Args:
       kind: node kind
@@ -64,7 +64,7 @@ def update_node(
     filter_node: Optional[dict] = None,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Update a node properties.
+    """Updates a node properties.
 
     Args:
       kind: node kind
@@ -98,7 +98,7 @@ def delete_node(
     completely=False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
-    """Delete a node completely from database or make it a thing of the past.
+    """Deletes a node completely from database or make it a thing of the past.
 
     Args:
       kind: node kind
@@ -134,7 +134,7 @@ def create_relationship(
     filter_b: dict,
     create_date: Optional[datetime.datetime] = None,
 ):
-    """Find nodes A and B and set a relationship between them.
+    """Finds nodes A and B and set a relationship between them.
 
     Args:
       kind_a: node A kind
@@ -171,7 +171,7 @@ def search_relationships(
     limit=10,
     programmer=0,
 ) -> list:
-    """Search existing relationships.
+    """Searches existing relationships.
 
     Args:
       relationship: relationship type
@@ -224,7 +224,7 @@ def update_relationship(
     filter_b: Optional[dict] = None,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Update a relationship properties.
+    """Updates a relationship properties.
 
     Args:
       relationship: relationship type
@@ -272,7 +272,7 @@ def delete_relationship(
     completely: bool = False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
-    """Delete a relationship between two nodes A and B.
+    """Deletes a relationship between two nodes A and B.
 
     Args:
       relationship: relationship type
