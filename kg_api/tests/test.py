@@ -145,7 +145,7 @@ def test_search():
 
 def test_update():
     graph.update_node(
-        "User", {"height": 175, "name": "Jay Ryan"}, filter_node={"name": "Jack Ryan"}
+        "User", {"height": 175, "name": "Jay Ryan"}, properties_filter={"name": "Jack Ryan"}
     )
     graph.update_node("User", {"country": "Russia"})
     # Sandy does all her habits every Friday

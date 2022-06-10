@@ -179,7 +179,7 @@ def iterate_generate_1node_and_1rel(
             kind_a=nodes[rel["start"]["id"]]["labels"][0],
             filter_a=rel["start"],
             relationship=rel["label"],
-            rel_dict=rel["properties"],
+            rel_properties=rel["properties"],
             kind_b=nodes[rel["end"]["id"]]["labels"][0],
             filter_b=rel["end"],
             create_date=rel["properties"]["_creation_timestamp"],
@@ -222,10 +222,10 @@ def fake_update(
                 for item in new_properties:
                     properties_dict.update(item)
                 graph.update_node(
-                    nodes[node_id]["labels"][0],
-                    properties_dict,
-                    {"id": node_id},
-                    _date,
+                    kind=nodes[node_id]["labels"][0],
+                    updates=properties_dict,
+                    properties_filter={"id": node_id},
+                    change_date=_date,
                 )
             else:
                 rel = rand.get_random_item(relationships)
@@ -289,12 +289,12 @@ def generate_specific_amount_of_data(
         _date += interval_in_days
         rel["properties"].update({"id": rel["id"], "_creation_timestamp": _date})
         graph.create_relationship(
-            nodes_dict[rel["start"]["id"]]["labels"][0],
-            rel["start"],
-            rel["label"],
-            rel["properties"],
-            nodes_dict[rel["end"]["id"]]["labels"][0],
-            rel["end"],
+            kind_a=nodes_dict[rel["start"]["id"]]["labels"][0],
+            filter_a=rel["start"],
+            relationship=rel["label"],
+            rel_properties=rel["properties"],
+            kind_b=nodes_dict[rel["end"]["id"]]["labels"][0],
+            filter_b=rel["end"],
             create_date=rel["properties"]["_creation_timestamp"],
         )
     return nodes_dict, relationships

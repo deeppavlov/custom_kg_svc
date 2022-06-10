@@ -63,13 +63,13 @@ def init_node_query(
     return query
 
 
-def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, dict]:
+def match_node_query(var_name: str, kind: str, properties_filter: dict) -> Tuple[str, dict]:
     """Prepares and sanitizes MATCH CYPHER query for nodes.
 
     Args:
       var_name: variable name which CYPHER will use to identify the match
       kind: node kind
-      filter_dict: node keyword arguments for matching
+      properties_filter: node keyword properties for matching
 
     Returns:
       query string, disambiguated parameters dict (parameter keys are
@@ -77,21 +77,21 @@ def match_node_query(var_name: str, kind: str, filter_dict: dict) -> Tuple[str, 
 
     """
     var_name = sanitize_alphanumeric(var_name)
-    filter_dict = sanitize_dict_keys(filter_dict)
+    properties_filter = sanitize_dict_keys(properties_filter)
 
-    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict)
-    updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
+    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in properties_filter)
+    updated_properties_filter = {f"{k}_{var_name}": v for k, v in properties_filter.items()}
     if kind:
         kind = sanitize_alphanumeric(kind)
         query = f"MATCH ({var_name}:{kind} {{{param_placeholders}}})"
     else:
         query = f"MATCH ({var_name} {{{param_placeholders}}})"
-    return query, updated_filter_dict
+    return query, updated_properties_filter
 
 
 def patch_property_query(
     var_name: str,
-    properties_dict: dict,
+    updates: dict,
     change_date: datetime.datetime,
     additional_label: str = "",
 ):
@@ -101,7 +101,7 @@ def patch_property_query(
 
     Args:
       var_name: variable name which CYPHER will use to identify the match
-      properties_dict: the property label to be updated
+      updates: new properties and updated properties
       change_date: the date of making change
       additional_label: The name of an additional Label to the new State
 
@@ -111,10 +111,10 @@ def patch_property_query(
     """
     var_name = sanitize_alphanumeric(var_name)
     additional_label = sanitize_alphanumeric(additional_label)
-    properties_dict = sanitize_dict_keys(properties_dict)
+    updates = sanitize_dict_keys(updates)
 
-    updated_filter_dict = {f"new_{k}_{var_name}": v for k, v in properties_dict.items()}
-    prop_placeholders = ", ".join(f"{k}: $new_{k}_{var_name}" for k in properties_dict)
+    updated_updates = {f"new_{k}_{var_name}": v for k, v in updates.items()}
+    prop_placeholders = ", ".join(f"{k}: $new_{k}_{var_name}" for k in updates)
 
     change_date_str = change_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
@@ -127,13 +127,13 @@ def patch_property_query(
     YIELD node
     RETURN node
     """
-    return query, updated_filter_dict
+    return query, updated_updates
 
 
 def create_relationship_query(
     var_name_a: str,
     relationship: str,
-    rel_dict: dict,
+    rel_properties: dict,
     var_name_b: str,
     create_date: datetime.datetime,
 ) -> str:
@@ -145,6 +145,7 @@ def create_relationship_query(
     Args:
       var_name_a: variable name which CYPHER will use to identify the first node match
       relationship: kind of relationship
+      rel_properties: relationship properties
       var_name_b: variable name which CYPHER will use to identify the second node match
       create_date: relationship creation date
 
@@ -155,8 +156,9 @@ def create_relationship_query(
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
     relationship = sanitize_alphanumeric(relationship)
-    rel_dict = sanitize_dict_keys(rel_dict)
-    param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_dict)
+    rel_properties = sanitize_dict_keys(rel_properties)
+
+    param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_properties)
     create_date_str = create_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
     query = f"""CALL graph.versioner.relationship.create(
         {var_name_a},
@@ -173,37 +175,37 @@ def create_relationship_query(
 
 def match_relationship_query(
     var_name_a: str,
-    var_name: str,
+    var_name_r: str,
     relationship: str,
-    filter_dict: dict,
+    rel_properties_filter: dict,
     var_name_b: str,
 ) -> Tuple[str, dict]:
     """Prepares and sanitizes MATCH CYPHER query for relationships.
 
     Args:
-      var_name: variable name which CYPHER will use to identify the relationship match
+      var_name_r: variable name which CYPHER will use to identify the relationship match
       var_name_a: variable name which CYPHER will use to identify the first node match
       var_name_b: variable name which CYPHER will use to identify the second node match
       relationship: relationship type
-      filter_dict: relationship keyword arguments for matching
+      rel_properties_filter: relationship keyword properties for matching
 
     Returns:
       query string, disambiguated parameters dict (parameter keys are
       renamed from {key} to {key}_{var_name})
 
     """
-    var_name = sanitize_alphanumeric(var_name)
+    var_name_r = sanitize_alphanumeric(var_name_r)
     relationship = sanitize_alphanumeric(relationship)
-    filter_dict = sanitize_dict_keys(filter_dict)
+    rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
-    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in filter_dict)
-    updated_filter_dict = {f"{k}_{var_name}": v for k, v in filter_dict.items()}
+    param_placeholders = ", ".join(f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter)
+    updated_rel_properties_filter = {f"{k}_{var_name_r}": v for k, v in rel_properties_filter.items()}
     query = (
         f"MATCH (source)-[:HAS_STATE]->"
-        f"({var_name_a})-[{var_name}:{relationship} {{{param_placeholders}}}]->"
+        f"({var_name_a})-[{var_name_r}:{relationship} {{{param_placeholders}}}]->"
         f"({var_name_b})-[:FOR]->(destination)"
     )
-    return query, updated_filter_dict
+    return query, updated_rel_properties_filter
 
 
 def delete_relationship_query(
@@ -239,14 +241,14 @@ def delete_relationship_query(
     return query
 
 
-def delete_query(var_name, node=True):
+def delete_query(var_name, is_node=True):
     """Prepares DELETE CYPHER query for nodes and relationships.
     
     Should be used together with match_query.
 
     Args:
       var_name: variable name which CYPHER will use to identify the match
-      node: True for deleting nodes, False for relationships
+      is_node: True for deleting nodes, False for relationships
 
     Returns:
       query string
@@ -254,7 +256,7 @@ def delete_query(var_name, node=True):
     """
     var_name = sanitize_alphanumeric(var_name)
     query = f"DELETE {var_name}"
-    if node:
+    if is_node:
         query = "DETACH " + query
     return query
 

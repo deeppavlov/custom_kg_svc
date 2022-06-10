@@ -32,25 +32,25 @@ def create_kind_node(
     query = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
     )
-    node_dict = {**immutable_properties, **state_properties}
-    db.cypher_query(query, node_dict)
+    params = {**immutable_properties, **state_properties}
+    db.cypher_query(query, params)
 
 
-def search_nodes(kind: str, node_dict: Optional[dict] = None, limit=10) -> list:
+def search_nodes(kind: str, properties_filter: Optional[dict] = None, limit=10) -> list:
     """Searches existing nodes.
 
     Args:
       kind: node kind
-      node_dict: node params
+      properties_filter: node keyword properties for matching
       limit: maximum number of returned nodes
 
     Returns:
       neo4j nodes list
 
     """
-    if node_dict is None:
-        node_dict = {}
-    match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
+    if properties_filter is None:
+        properties_filter = {}
+    match_a, filter_a = querymaker.match_node_query("a", kind, properties_filter)
     return_ = f"RETURN a\n LIMIT {limit}"
     query = "\n".join([match_a, return_])
 
@@ -61,40 +61,40 @@ def search_nodes(kind: str, node_dict: Optional[dict] = None, limit=10) -> list:
 def update_node(
     kind: str,
     updates: dict,
-    filter_node: Optional[dict] = None,
+    properties_filter: Optional[dict] = None,
     change_date: Optional[datetime.datetime] = None,
 ):
     """Updates a node properties.
 
     Args:
       kind: node kind
-      filter_node: node match filter
+      properties_filter: node keyword properties for matching
       updates: new properties and updated properties
       change_date: the date of node updating
 
     Returns:
 
     """
-    if filter_node is None:
-        filter_node = {}
+    if properties_filter is None:
+        properties_filter = {}
     if change_date is None:
         change_date = datetime.datetime.now()
 
-    nodes = search_nodes(kind, filter_node)
+    nodes = search_nodes(kind, properties_filter)
     if len(nodes) == 1:  # we need to update exactly one node
-        match_node, filter_node = querymaker.match_node_query("a", kind, filter_node)
+        match_a, properties_filter = querymaker.match_node_query("a", kind, properties_filter)
         with_ = querymaker.with_query(["a"])
         set_query, updated_updates = querymaker.patch_property_query(
             "a", updates, change_date
         )
-        params = {**filter_node, **updated_updates}
-        query = "\n".join([match_node, with_, set_query])
+        params = {**properties_filter, **updated_updates}
+        query = "\n".join([match_a, with_, set_query])
         db.cypher_query(query, params)
 
 
 def delete_node(
     kind: str,
-    node_dict: dict,
+    properties_filter: dict,
     completely=False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
@@ -102,7 +102,7 @@ def delete_node(
 
     Args:
       kind: node kind
-      node_dict: node params
+      properties_filter: node keyword properties for matching
       completely: if True, then the node will be deleted completely from DB
                   with all its relationships. If False, the node will be marked
                   as deleted by the _deleted property.
@@ -114,7 +114,7 @@ def delete_node(
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
     if completely:
-        match_a, filter_a = querymaker.match_node_query("a", kind, node_dict)
+        match_a, filter_a = querymaker.match_node_query("a", kind, properties_filter)
         delete_a = querymaker.delete_query("a")
 
         query = "\n".join([match_a, delete_a])
@@ -122,14 +122,14 @@ def delete_node(
 
         db.cypher_query(query, params)
     else:
-        update_node(kind, {"_deleted": True}, node_dict, deletion_date)
+        update_node(kind, {"_deleted": True}, properties_filter, deletion_date)
 
 
 def create_relationship(
     kind_a: str,
     filter_a: dict,
     relationship: str,
-    rel_dict: dict,
+    rel_properties: dict,
     kind_b: str,
     filter_b: dict,
     create_date: Optional[datetime.datetime] = None,
@@ -140,6 +140,7 @@ def create_relationship(
       kind_a: node A kind
       filter_a: node A match filter
       relationship: relationship between nodes A and B
+      rel_properties: relationship properties
       kind_b: node B kind
       filter_b: node B match filter
       create_date: relationship creation date
@@ -152,18 +153,18 @@ def create_relationship(
     match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
     rel = querymaker.create_relationship_query(
-        "a", relationship, rel_dict, "b", create_date
+        "a", relationship, rel_properties, "b", create_date
     )
     with_ = querymaker.with_query(["a", "b"])
     query = "\n".join([match_a, match_b, with_, rel])
-    params = {**filter_a, **filter_b, **rel_dict}
+    params = {**filter_a, **filter_b, **rel_properties}
 
     db.cypher_query(query, params)
 
 
 def search_relationships(
     relationship: str,
-    filter_dict: Optional[dict] = None,
+    rel_properties_filter: Optional[dict] = None,
     kind_a: str = "",
     filter_a: Optional[dict] = None,
     kind_b: str = "",
@@ -175,7 +176,7 @@ def search_relationships(
 
     Args:
       relationship: relationship type
-      filter_dict: relationship params
+      rel_properties_filter: relationship keyword properties for matching
       kind_a: node A kind
       filter_a: node A match filter
       kind_b: node B kind
@@ -188,27 +189,27 @@ def search_relationships(
       neo4j relationships list
 
     """
-    if filter_dict is None:
-        filter_dict = {}
+    if rel_properties_filter is None:
+        rel_properties_filter = {}
     if filter_a is None:
         filter_a = {}
     if filter_b is None:
         filter_b = {}
-    node_a_query, node_b_query = [""] * 2
+    match_a, match_b = [""] * 2
     if kind_a:
-        node_a_query, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
+        match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     if kind_b:
-        node_b_query, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
-    rel_query, filter_dict = querymaker.match_relationship_query(
-        "a", "r", relationship, filter_dict, "b"
+        match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
+    rel_query, rel_properties_filter = querymaker.match_relationship_query(
+        "a", "r", relationship, rel_properties_filter, "b"
     )
     return_ = f"RETURN source, r, destination\nLIMIT {limit}"
 
-    query = "\n".join([node_a_query, node_b_query, rel_query, return_])
-    params = {**filter_a, **filter_b, **filter_dict}
+    query = "\n".join([match_a, match_b, rel_query, return_])
+    params = {**filter_a, **filter_b, **rel_properties_filter}
 
     if programmer:
-        query = "\n".join([node_a_query, node_b_query, rel_query])
+        query = "\n".join([match_a, match_b, rel_query])
         return query, params
 
     rels, _ = db.cypher_query(query, params)
@@ -256,7 +257,7 @@ def update_relationship(
         kind_a=kind_a,
         filter_a=filter_a,
         relationship=relationship,
-        rel_dict=updates,
+        rel_properties=updates,
         kind_b=kind_b,
         filter_b=filter_b,
         create_date=change_date,
@@ -304,20 +305,20 @@ def delete_relationship(
             filter_b=filter_b,
             programmer=1,
         )
-        delete_query = querymaker.delete_query("r", node=False)
+        delete_query = querymaker.delete_query("r", is_node=False)
         query = "\n".join([match_relationship, delete_query])
 
         db.cypher_query(query, params)
     else:
-        node_a_query, node_b_query = [""] * 2
-        node_a_query, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
-        node_b_query, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
+        match_a, match_b = [""] * 2
+        match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
+        match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
 
         delete_query = querymaker.delete_relationship_query(
             "a", relationship, "b", deletion_date
         )
 
-        query = "\n".join([node_a_query, node_b_query, delete_query])
+        query = "\n".join([match_a, match_b, delete_query])
         params = {**filter_a, **filter_b}
 
         db.cypher_query(query, params)
