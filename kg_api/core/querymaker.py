@@ -31,7 +31,7 @@ def init_node_query(
     immutable_properties: dict,
     state_properties: dict,
     create_date: datetime.datetime,
-) -> str:
+) -> Tuple[str, dict]:
     """Prepares and sanitizes graph.versioner.init CYPHER query for node creation.
 
     Args:
@@ -41,15 +41,18 @@ def init_node_query(
       create_date: node creation date
 
     Returns:
-      query string
-
+      query string, disambiguated property labels
     """
     kind = sanitize_alphanumeric(kind)
     immutable_properties = sanitize_dict_keys(immutable_properties)
     state_properties = sanitize_dict_keys(state_properties)
 
-    immutable_prop_placeholders = ", ".join(f"{k}: ${k}" for k in immutable_properties)
-    state_prop_placeholders = ", ".join(f"{k}: ${k}" for k in state_properties)
+    immutable_prop_placeholders = ", ".join(f"{k}: $new_{k}" for k in immutable_properties)
+    state_prop_placeholders = ", ".join(f"{k}: $new_{k}" for k in state_properties)
+
+    updated_immutable_properties = {f"new_{k}":v for k,v in immutable_properties.items()}
+    updated_state_properties = {f"new_{k}":v for k,v in state_properties.items()}
+    params = {**updated_immutable_properties, **updated_state_properties}
 
     create_date_str = create_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
@@ -60,7 +63,7 @@ def init_node_query(
     YIELD node
     RETURN node
     """
-    return query
+    return query, params
 
 
 def match_node_query(var_name: str, kind: str, properties_filter: dict) -> Tuple[str, dict]:
@@ -136,7 +139,7 @@ def create_relationship_query(
     rel_properties: dict,
     var_name_b: str,
     create_date: datetime.datetime,
-) -> str:
+) -> Tuple[str, dict]:
     """Prepares and sanitizes versioner's create CYPHER query for relationship creation.
     
     The versioner's create query is graph.versioner.relationship.create.
@@ -150,7 +153,7 @@ def create_relationship_query(
       create_date: relationship creation date
 
     Returns:
-      query string
+      query string, disambiguated property labels
 
     """
     var_name_a = sanitize_alphanumeric(var_name_a)
@@ -158,7 +161,9 @@ def create_relationship_query(
     relationship = sanitize_alphanumeric(relationship)
     rel_properties = sanitize_dict_keys(rel_properties)
 
-    param_placeholders = ", ".join(f"{k}: ${k}" for k in rel_properties)
+    param_placeholders = ", ".join(f"{k}: $new_{k}" for k in rel_properties)
+    updated_rel_properties = {f"new_{k}":v for k,v in rel_properties.items()}
+
     create_date_str = create_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
     query = f"""CALL graph.versioner.relationship.create(
         {var_name_a},
@@ -170,7 +175,7 @@ def create_relationship_query(
     YIELD relationship
     RETURN relationship
     """
-    return query
+    return query, updated_rel_properties
 
 
 def match_relationship_query(

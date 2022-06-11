@@ -29,10 +29,10 @@ def create_kind_node(
     """
     if create_date is None:
         create_date = datetime.datetime.now()
-    query = querymaker.init_node_query(
+    query, params = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
     )
-    params = {**immutable_properties, **state_properties}
+
     db.cypher_query(query, params)
 
 
@@ -152,7 +152,7 @@ def create_relationship(
         create_date = datetime.datetime.now()
     match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
     match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
-    rel = querymaker.create_relationship_query(
+    rel, rel_properties = querymaker.create_relationship_query(
         "a", relationship, rel_properties, "b", create_date
     )
     with_ = querymaker.with_query(["a", "b"])
