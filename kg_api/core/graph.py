@@ -1,6 +1,9 @@
 from typing import Optional
 import logging
 import datetime
+import pandas as pd
+
+import neo4j
 from neomodel import db, config, clear_neo4j_database
 from kg_api.utils.settings import OntologySettings
 import kg_api.core.querymaker as querymaker
@@ -336,6 +339,108 @@ def delete_relationship(
         db.cypher_query(query, params)
 
 
-ontology_settings = OntologySettings()
+def get_current_state(kind: str, properties_filter: dict) -> list:
+    """Retrieves the current State node: by a given Entity node.
+
+    Args:
+      kind: node kind
+      properties_filter: node keyword properties for matching
+
+    Returns:
+      List of nodes
+
+    """
+    match_query, params = querymaker.match_node_query("s", kind, properties_filter)
+    get_query = querymaker.get_current_state_query("s")
+
+    query = "\n".join([match_query, get_query])
+    nodes, _ = db.cypher_query(query, params)
+    return nodes
+
+
+def get_all_path(kind: str, properties_filter: dict) -> Optional[neo4j.graph.Path]: # type: ignore
+    """Retrieves all Entity's history in a path, including the Entity node,
+       all the State nodes, CURRENT and PREVIOUS relationships.
+
+    Args:
+      kind: node kind
+      properties_filter: node keyword properties for matching
+
+    Returns:
+      path object
+
+    """
+    match, properties_filter = querymaker.match_node_query("a", kind, properties_filter)
+    with_ = querymaker.with_query(["a"])
+    get = querymaker.get_all_path_query("a")
+
+    query = "\n".join([match, with_, get])
+    path, _ = db.cypher_query(query, properties_filter)
+    if path:
+        return path[0][0]
+    else:
+        logging.warning("There is no known path for the requested node")
+        return None
+
+def get_node_history(kind: str, properties_filter: dict) -> Optional[pd.DataFrame]:
+    """Retrieves all changes that happened to a node from its creation moment, using
+       the versioner's diff function.
+
+    Args:
+      kind: node kind
+      properties_filter: node keyword properties for matching
+
+    Returns:
+      Pandas dataframe consisting of columns: ["operation", "label", "oldValue", "newValue"]
+
+    """
+    path = get_all_path(kind, properties_filter)
+    if not path:
+        logging.error("There is no known history for the requested node")
+        return None
+    nodes_by_ascending_date = tuple(reversed(path.nodes))
+
+    results = []
+    old_new_couples = zip(nodes_by_ascending_date[:-1], nodes_by_ascending_date[1:])
+    for old, new in old_new_couples:
+        match_from, _ = querymaker.match_node_query("state_from", "State", {})
+        match_to, _ = querymaker.match_node_query("state_to", "State", {})
+
+        where_from = querymaker.where_node_internal_id_equal_to("state_from", old.id)
+        with_ = querymaker.with_query(["state_from", "state_to"])
+        where_to = querymaker.where_node_internal_id_equal_to("state_to", new.id)
+
+        diff = querymaker.diff_query("state_from", "state_to")
+
+        query = "\n".join([match_from, match_to, where_from, with_, where_to, diff])
+
+        list_of_changes, _ = db.cypher_query(query)
+        results += list_of_changes + [["","","",""]]
+
+    diff_table = pd.DataFrame(results, columns=["operation", "label", "oldValue", "newValue"])
+    return diff_table
+
+
+def semantic_action_history(kind: str, properties_filter: dict) -> Optional[list]:
+    """Retrieves semantic action changes that happened to a node from its creation moment.
+
+    Args:
+      kind: node kind
+      properties_filter: node keyword properties for matching
+
+    Returns:
+      List of semantic action changes.
+
+    """
+    path = get_all_path(kind, properties_filter)
+    if not path:
+        logging.error("There is no known semantic action history for the requested node")
+        return None
+    nodes_by_ascending_date = tuple(reversed(path.nodes))
+
+    semantic_actions = []
+    for node in nodes_by_ascending_date:
+        semantic_actions.append(node.get("SemanticActionDescription"))
+    return semantic_actions
 
 config.DATABASE_URL = ontology_settings.neo4j_bolt_url

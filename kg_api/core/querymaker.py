@@ -296,3 +296,93 @@ def with_query(var_names: list) -> str:
 
     query = query + var_names_str
     return query
+
+
+def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
+    """Prepares and sanitize WHERE CYPHER query to add a constraint on internal id to the
+       patterns in a MATCH clause.
+
+    Should be used together with match_query.
+    Takes the CYPHER form: WHERE id(var_name) = value
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      value: the internal id value to match on
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    assert isinstance(value, int), "internal id value should be int"
+
+    query = f"WHERE id({var_name}) = {value}"
+    return query
+
+
+def get_current_state_query(var_name: str) -> str:
+    """Prepares and sanitizes versioner's get_current_state node query.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node RETURN node"
+
+    return query
+
+
+def get_all_path_query(var_name: str) -> str:
+    """Prepares and sanitizes versioner's get_all query.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    query = f"""CALL graph.versioner.get.all({var_name}) YIELD path RETURN path"""
+    return query
+
+
+def diff_query(state_from_var: str, state_to_var: str) -> str:
+    """Prepares and sanitizes versioner's diff query.
+
+    Diff function offers a list of operations needed in order to obtain a given State
+    node, from another given one. It will return all the properties of both nodes, coupled
+    with an operation.
+    Those possible operations are:
+      REMOVE - if the property should be removed
+      ADD - if the property is a new one
+      UPDATE - if the property has changed
+
+    Should be used together with match_query.
+
+    Args:
+      state_from_var: variable name which CYPHER will use to identify the starting State node
+      for the comparison.
+      state_to_var: variable name which CYPHER will use to identify the starting State node
+      for the comparison.
+
+    Returns:
+      query string
+
+    """
+    state_from_var = sanitize_alphanumeric(state_from_var)
+    state_to_var = sanitize_alphanumeric(state_to_var)
+
+    query = f"""CALL graph.versioner.diff({state_from_var}, {state_to_var})
+        YIELD operation, label, oldValue, newValue
+        RETURN operation, label, oldValue, newValue
+    """
+    return query
