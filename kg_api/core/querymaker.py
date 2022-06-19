@@ -1,3 +1,4 @@
+from typing import Optional
 from typing import Tuple
 import datetime
 
@@ -66,7 +67,9 @@ def init_node_query(
     return query, params
 
 
-def match_node_query(var_name: str, kind: str, properties_filter: dict) -> Tuple[str, dict]:
+def match_node_query(
+    var_name: str, kind: str = "", properties_filter: Optional[dict] = None
+) -> Tuple[str, dict]:
     """Prepares and sanitizes MATCH CYPHER query for nodes.
 
     Args:
@@ -79,17 +82,26 @@ def match_node_query(var_name: str, kind: str, properties_filter: dict) -> Tuple
       renamed from {key} to {key}_{var_name})
 
     """
+    if properties_filter is None:
+        properties_filter = {}
     var_name = sanitize_alphanumeric(var_name)
     properties_filter = sanitize_dict_keys(properties_filter)
 
-    param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in properties_filter)
-    updated_properties_filter = {f"{k}_{var_name}": v for k, v in properties_filter.items()}
+    query = f"MATCH ({var_name}"
+    specify_kind = ""
+    specify_param_placeholders = ")"
+
     if kind:
         kind = sanitize_alphanumeric(kind)
-        query = f"MATCH ({var_name}:{kind} {{{param_placeholders}}})"
-    else:
-        query = f"MATCH ({var_name} {{{param_placeholders}}})"
-    return query, updated_properties_filter
+        specify_kind = f": {kind}"
+
+    if properties_filter:
+        param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in properties_filter)
+        properties_filter = {f"{k}_{var_name}": v for k, v in properties_filter.items()}
+        specify_param_placeholders = f"{{{param_placeholders}}})"
+    
+    query = "".join([query, specify_kind, specify_param_placeholders])
+    return query, properties_filter
 
 
 def patch_property_query(

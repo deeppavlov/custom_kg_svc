@@ -176,6 +176,7 @@ def search_relationships(
     filter_b: Optional[dict] = None,
     limit=10,
     programmer=0,
+    by_state_properties: bool = True,
 ) -> list:
     """Searches existing relationships.
 
@@ -200,10 +201,16 @@ def search_relationships(
         filter_a = {}
     if filter_b is None:
         filter_b = {}
+    if by_state_properties:
+        var_name_1 = "a"
+        var_name_2 = "b"
+    else:
+        var_name_1 = "source"
+        var_name_2 = "destination"
 
     match_a, match_b = [""] * 2
-    match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
-    match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
+    match_a, filter_a = querymaker.match_node_query(var_name_1, kind_a, filter_a)
+    match_b, filter_b = querymaker.match_node_query(var_name_2, kind_b, filter_b)
     rel_query, rel_properties_filter = querymaker.match_relationship_query(
         "a", "r", relationship, rel_properties_filter, "b"
     )
