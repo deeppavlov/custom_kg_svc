@@ -94,7 +94,7 @@ def remove_node(
 def add_property_to_node(
     kind: str,
     id: str,
-    property_name: str,
+    property_kind: str,
     property_value):
     """Adds a new property to a given node
     """
@@ -107,7 +107,7 @@ def add_property_to_node(
 def update_property_in_node(
     kind: str,
     id: str,
-    property_name: str,
+    property_kind: str,
     property_value):
     """Updates a property for a given node
     """
@@ -120,7 +120,7 @@ def update_property_in_node(
 def remove_property_from_node(
     kind: str,
     id: str,
-    property_name: str):
+    property_kind: str):
     """Removes a property from a given node
     """
 
@@ -203,7 +203,7 @@ def delete_node(
 def create_relationship(
     kind_a: str,
     filter_a: dict,
-    relationship: str,
+    relationship_kind: str,
     rel_properties: dict,
     kind_b: str,
     filter_b: dict,
@@ -238,7 +238,7 @@ def create_relationship(
 
 
 def search_relationships(
-    relationship: str,
+    relationship_kind: str,
     rel_properties_filter: Optional[dict] = None,
     kind_a: str = "",
     filter_a: Optional[dict] = None,
@@ -299,7 +299,7 @@ def search_relationships(
 
 
 def update_relationship(
-    relationship: str,
+    relationship_kind: str,
     updates: dict,
     kind_a: str,
     kind_b: str,
@@ -347,7 +347,7 @@ def update_relationship(
 
 
 def delete_relationship(
-    relationship: str,
+    relationship_kind: str,
     kind_a: str,
     kind_b: str,
     filter_a: Optional[dict] = None,
