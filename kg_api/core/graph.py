@@ -62,6 +62,73 @@ def search_nodes(kind: str, properties_filter: Optional[dict] = None, limit=10) 
     return nodes
 
 
+def add_node(
+    kind: str,
+    id: str,
+    properties,
+    date_of_creation
+):
+
+
+    return node
+
+
+def update_node(
+    kind: str,
+    id: str,
+    updated_properties,
+    date_of_update
+):
+
+
+    return node
+
+
+def remove_node(
+    kind: str,
+    id: str,
+    date_of_deletion
+)
+
+
+def add_property_to_node(
+    kind: str,
+    id: str,
+    property_name: str,
+    property_value):
+    """Adds a new property to a given node
+    """
+
+    # some code here
+
+    return node
+
+
+def update_property_in_node(
+    kind: str,
+    id: str,
+    property_name: str,
+    property_value):
+    """Updates a property for a given node
+    """
+
+    # some code here
+
+    return node
+
+
+def remove_property_from_node(
+    kind: str,
+    id: str,
+    property_name: str):
+    """Removes a property from a given node
+    """
+
+    # some code here
+
+    return node
+
+
 def update_node(
     kind: str,
     updates: dict,
