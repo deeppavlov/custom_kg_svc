@@ -147,7 +147,7 @@ def patch_property_query(
 
 def create_relationship_query(
     var_name_a: str,
-    relationship: str,
+    relationship_kind: str,
     rel_properties: dict,
     var_name_b: str,
     create_date: datetime.datetime,
@@ -159,7 +159,7 @@ def create_relationship_query(
 
     Args:
       var_name_a: variable name which CYPHER will use to identify the first node match
-      relationship: kind of relationship
+      relationship_kind: kind of relationship
       rel_properties: relationship properties
       var_name_b: variable name which CYPHER will use to identify the second node match
       create_date: relationship creation date
@@ -170,7 +170,7 @@ def create_relationship_query(
     """
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
-    relationship = sanitize_alphanumeric(relationship)
+    relationship_kind = sanitize_alphanumeric(relationship_kind)
     rel_properties = sanitize_dict_keys(rel_properties)
 
     param_placeholders = ", ".join(f"{k}: $new_{k}" for k in rel_properties)
@@ -180,7 +180,7 @@ def create_relationship_query(
     query = f"""CALL graph.versioner.relationship.create(
         {var_name_a},
         {var_name_b},
-        "{relationship}",
+        "{relationship_kind}",
         {{{param_placeholders}}},
         localdatetime("{create_date_str}")
     )
@@ -193,7 +193,7 @@ def create_relationship_query(
 def match_relationship_query(
     var_name_a: str,
     var_name_r: str,
-    relationship: str,
+    relationship_kind: str,
     rel_properties_filter: dict,
     var_name_b: str,
 ) -> Tuple[str, dict]:
@@ -203,7 +203,7 @@ def match_relationship_query(
       var_name_r: variable name which CYPHER will use to identify the relationship match
       var_name_a: variable name which CYPHER will use to identify the first node match
       var_name_b: variable name which CYPHER will use to identify the second node match
-      relationship: relationship type
+      relationship_kind: relationship type
       rel_properties_filter: relationship keyword properties for matching
 
     Returns:
@@ -212,21 +212,21 @@ def match_relationship_query(
 
     """
     var_name_r = sanitize_alphanumeric(var_name_r)
-    relationship = sanitize_alphanumeric(relationship)
+    relationship_kind = sanitize_alphanumeric(relationship_kind)
     rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter)
     updated_rel_properties_filter = {f"{k}_{var_name_r}": v for k, v in rel_properties_filter.items()}
     query = (
         f"MATCH (source)-[:HAS_STATE]->"
-        f"({var_name_a})-[{var_name_r}:{relationship} {{{param_placeholders}}}]->"
+        f"({var_name_a})-[{var_name_r}:{relationship_kind} {{{param_placeholders}}}]->"
         f"({var_name_b})-[:FOR]->(destination)"
     )
     return query, updated_rel_properties_filter
 
 
 def delete_relationship_query(
-    var_name_a: str, relationship: str, var_name_b: str, change_date: datetime.datetime
+    var_name_a: str, relationship_kind: str, var_name_b: str, change_date: datetime.datetime
 ) -> str:
     """Prepares and sanitizes versioner's delete CYPHER query for relationship deletion.
     
@@ -235,7 +235,7 @@ def delete_relationship_query(
 
     Args:
       var_name_a: variable name which CYPHER will use to identify the first node match
-      relationship: kind of relationship
+      relationship_kind: kind of relationship
       var_name_b: variable name which CYPHER will use to identify the second node match
       change_date: the date of relationship deletion
 
@@ -245,12 +245,12 @@ def delete_relationship_query(
     """
     var_name_a = sanitize_alphanumeric(var_name_a)
     var_name_b = sanitize_alphanumeric(var_name_b)
-    relationship = sanitize_alphanumeric(relationship)
+    relationship_kind = sanitize_alphanumeric(relationship_kind)
 
     change_date_str = change_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
     query = f"""CALL graph.versioner.relationship.delete(
-        {var_name_a}, {var_name_b}, "{relationship}", localdatetime("{change_date_str}")
+        {var_name_a}, {var_name_b}, "{relationship_kind}", localdatetime("{change_date_str}")
     )
     YIELD result
     RETURN result

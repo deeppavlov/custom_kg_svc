@@ -11,9 +11,9 @@ def drop_database():
     clear_neo4j_database(db)
 
 
-def create_kind_node(
+def create_node(
     kind: str,
-    immutable_properties: dict,
+    id_: str,
     state_properties: dict,
     create_date: Optional[datetime.datetime] = None,
 ):
@@ -21,7 +21,7 @@ def create_kind_node(
 
     Args:
       kind: node kind
-      immutable_properties: A Map representing the Entity immutable properties.
+      id_: Entity id
       state_properties: A Map representing the Entity state properties (mutable).
       create_date: node creation date
 
@@ -30,6 +30,7 @@ def create_kind_node(
     """
     if create_date is None:
         create_date = datetime.datetime.now()
+    immutable_properties = {"Id": id_}
     query, params = querymaker.init_node_query(
         kind, immutable_properties, state_properties, create_date
     )
@@ -37,7 +38,7 @@ def create_kind_node(
     db.cypher_query(query, params)
 
 
-def search_nodes(kind: str, properties_filter: Optional[dict] = None, limit=10) -> list:
+def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
     """Searches existing nodes.
 
     Args:
@@ -60,32 +61,31 @@ def search_nodes(kind: str, properties_filter: Optional[dict] = None, limit=10) 
 
 
 def update_node(
-    kind: str,
+    id_: str,
     updates: dict,
-    properties_filter: Optional[dict] = None,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Updates a node properties.
+    """Updates and Adds node properties.
 
     Args:
-      kind: node kind
-      properties_filter: node keyword properties for matching
+      id_: entity id
       updates: new properties and updated properties
       change_date: the date of node updating
 
     Returns:
 
     """
-    if properties_filter is None:
-        properties_filter = {}
+    properties_filter = {"Id": id_}
     if change_date is None:
         change_date = datetime.datetime.now()
 
-    nodes = search_nodes(kind, properties_filter)
+    nodes = search_nodes(properties_filter=properties_filter)
     if nodes:
         if len(nodes) > 1:
             logging.info("Updating multiple nodes")
-        match_a, properties_filter = querymaker.match_node_query("a", kind, properties_filter)
+        match_a, properties_filter = querymaker.match_node_query(
+            "a", properties_filter=properties_filter
+        )
         with_ = querymaker.with_query(["a"])
         set_query, updated_updates = querymaker.patch_property_query(
             "a", updates, change_date
@@ -98,16 +98,14 @@ def update_node(
 
 
 def delete_node(
-    kind: str,
-    properties_filter: dict,
+    id_: str,
     completely=False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
     """Deletes a node completely from database or make it a thing of the past.
 
     Args:
-      kind: node kind
-      properties_filter: node keyword properties for matching
+      id_: entity id
       completely: if True, then the node will be deleted completely from DB
                   with all its relationships. If False, the node will be marked
                   as deleted by the _deleted property.
@@ -118,8 +116,9 @@ def delete_node(
     """
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
+    properties_filter = {"Id": id_}
     if completely:
-        match_a, filter_a = querymaker.match_node_query("a", kind, properties_filter)
+        match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
         delete_a = querymaker.delete_query("a")
 
         query = "\n".join([match_a, delete_a])
@@ -127,27 +126,23 @@ def delete_node(
 
         db.cypher_query(query, params)
     else:
-        update_node(kind, {"_deleted": True}, properties_filter, deletion_date)
+        update_node(properties_filter["Id"], {"_deleted": True}, deletion_date)
 
 
 def create_relationship(
-    kind_a: str,
-    filter_a: dict,
-    relationship: str,
+    id_a: str,
+    relationship_kind: str,
     rel_properties: dict,
-    kind_b: str,
-    filter_b: dict,
+    id_b: str,
     create_date: Optional[datetime.datetime] = None,
 ):
     """Finds nodes A and B and set a relationship between them.
 
     Args:
-      kind_a: node A kind
-      filter_a: node A match filter
-      relationship: relationship between nodes A and B
+      id_a: id of entity A
+      relationship_kind: relationship between entities A and B
       rel_properties: relationship properties
-      kind_b: node B kind
-      filter_b: node B match filter
+      id_b: id of entity B
       create_date: relationship creation date
 
     Returns:
@@ -155,10 +150,10 @@ def create_relationship(
     """
     if create_date is None:
         create_date = datetime.datetime.now()
-    match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
-    match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
+    match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
     rel, rel_properties = querymaker.create_relationship_query(
-        "a", relationship, rel_properties, "b", create_date
+        "a", relationship_kind, rel_properties, "b", create_date
     )
     with_ = querymaker.with_query(["a", "b"])
     query = "\n".join([match_a, match_b, with_, rel])
@@ -168,12 +163,10 @@ def create_relationship(
 
 
 def search_relationships(
-    relationship: str,
+    relationship_kind: str,
     rel_properties_filter: Optional[dict] = None,
-    kind_a: str = "",
-    filter_a: Optional[dict] = None,
-    kind_b: str = "",
-    filter_b: Optional[dict] = None,
+    id_a: str = "",
+    id_b: str = "",
     limit=10,
     programmer=0,
     by_state_properties: bool = True,
@@ -181,12 +174,10 @@ def search_relationships(
     """Searches existing relationships.
 
     Args:
-      relationship: relationship type
+      relationship_kind: relationship type
       rel_properties_filter: relationship keyword properties for matching
-      kind_a: node A kind
-      filter_a: node A match filter
-      kind_b: node B kind
-      filter_b: node B match filter
+      id_a: id of entity A
+      id_b: id of entity B
       limit: maximum # nodes returned
       programmer: False for returning the relationship found. True for returning
                   (query, params) of that relationship matching.
@@ -197,10 +188,7 @@ def search_relationships(
     """
     if rel_properties_filter is None:
         rel_properties_filter = {}
-    if filter_a is None:
-        filter_a = {}
-    if filter_b is None:
-        filter_b = {}
+
     if by_state_properties:
         var_name_1 = "a"
         var_name_2 = "b"
@@ -209,10 +197,10 @@ def search_relationships(
         var_name_2 = "destination"
 
     match_a, match_b = [""] * 2
-    match_a, filter_a = querymaker.match_node_query(var_name_1, kind_a, filter_a)
-    match_b, filter_b = querymaker.match_node_query(var_name_2, kind_b, filter_b)
+    match_a, filter_a = querymaker.match_node_query(var_name_1, properties_filter={"Id": id_a})
+    match_b, filter_b = querymaker.match_node_query(var_name_2, properties_filter={"Id": id_b})
     rel_query, rel_properties_filter = querymaker.match_relationship_query(
-        "a", "r", relationship, rel_properties_filter, "b"
+        "a", "r", relationship_kind, rel_properties_filter, "b"
     )
 
     return_ = f"RETURN source, r, destination\nLIMIT {limit}"
@@ -229,23 +217,19 @@ def search_relationships(
 
 
 def update_relationship(
-    relationship: str,
+    relationship_kind: str,
     updates: dict,
-    kind_a: str,
-    kind_b: str,
-    filter_a: Optional[dict] = None,
-    filter_b: Optional[dict] = None,
+    id_a: str,
+    id_b: str,
     change_date: Optional[datetime.datetime] = None,
 ):
     """Updates a relationship properties.
 
     Args:
-      relationship: relationship type
+      relationship_kind: relationship type
       updates: new properties and updated properties
-      kind_a: node A kind
-      filter_a: node A match filter
-      kind_b: node B kind
-      filter_b: node B match filter
+      id_a: id of entity A
+      id_b: id of entity B
       change_date: the date of node updating
 
     Returns:
@@ -255,44 +239,35 @@ def update_relationship(
     #   special function for doing that in the versioner.
     # - Notice that you need to save the relationship's properties before deletion, in order to
     #   use them in creating the new one.
-    if filter_a is None:
-        filter_a = {}
-    if filter_b is None:
-        filter_b = {}
+
     if change_date is None:
         change_date = datetime.datetime.now()
 
     delete_relationship(
-        relationship, kind_a, kind_b, filter_a, filter_b, deletion_date=change_date
+        relationship_kind, id_a, id_b, deletion_date=change_date
     )
     create_relationship(
-        kind_a=kind_a,
-        filter_a=filter_a,
-        relationship=relationship,
+        id_a=id_a,
+        relationship_kind=relationship_kind,
         rel_properties=updates,
-        kind_b=kind_b,
-        filter_b=filter_b,
+        id_b=id_b,
         create_date=change_date,
     )
 
 
 def delete_relationship(
-    relationship: str,
-    kind_a: str,
-    kind_b: str,
-    filter_a: Optional[dict] = None,
-    filter_b: Optional[dict] = None,
+    relationship_kind: str,
+    id_a: str,
+    id_b: str,
     completely: bool = False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
     """Deletes a relationship between two nodes A and B.
 
     Args:
-      relationship: relationship type
-      kind_a: node A kind
-      filter_a: node A match filter
-      kind_b: node B kind
-      filter_b: node B match filter
+      relationship_kind: relationship type
+      id_a: id of entity A
+      id_b: id of entity B
       completely: if True, then the relationship will be deleted completely
                   from DB. If False, a new state node will be created via the versioner
                   to indicate a new state without the deleted relationship.
@@ -301,20 +276,14 @@ def delete_relationship(
     Returns:
 
     """
-    if filter_a is None:
-        filter_a = {}
-    if filter_b is None:
-        filter_b = {}
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
 
     if completely:
         match_relationship, params = search_relationships(
-            relationship,
-            kind_a=kind_a,
-            filter_a=filter_a,
-            kind_b=kind_b,
-            filter_b=filter_b,
+            relationship_kind,
+            id_a=id_a,
+            id_b=id_b,
             programmer=1,
         )
         delete_query = querymaker.delete_query("r", is_node=False)
@@ -323,11 +292,11 @@ def delete_relationship(
         db.cypher_query(query, params)
     else:
         match_a, match_b = [""] * 2
-        match_a, filter_a = querymaker.match_node_query("a", kind_a, filter_a)
-        match_b, filter_b = querymaker.match_node_query("b", kind_b, filter_b)
+        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
+        match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
 
         delete_query = querymaker.delete_relationship_query(
-            "a", relationship, "b", deletion_date
+            "a", relationship_kind, "b", deletion_date
         )
 
         query = "\n".join([match_a, match_b, delete_query])

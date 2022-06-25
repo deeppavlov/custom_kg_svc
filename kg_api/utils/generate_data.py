@@ -28,7 +28,7 @@ users = Schema(
     schema=lambda: {
         str(numeric.increment(accumulator="node_id")): {
             "type": "node",
-            "id": str(numeric.increment(accumulator="same_node_id")),
+            "Id": str(numeric.increment(accumulator="same_node_id")),
             "labels": ["User"],
             "properties": {
                 "name": field("full_name"),
@@ -50,7 +50,7 @@ entities = Schema(
     schema=lambda: {
         str(numeric.increment(accumulator="node_id")): {
             "type": "node",
-            "id": str(numeric.increment(accumulator="same_node_id")),
+            "Id": str(numeric.increment(accumulator="same_node_id")),
             "labels": rand.get_random_item(NODE_LABELS),
             "properties": {
                 "name": "".join(
@@ -77,7 +77,7 @@ entities = Schema(
 # random relationships generator
 rels = Schema(
     schema=lambda: {
-        "id": numeric.increment(accumulator="rel_id"),
+        "Id": numeric.increment(accumulator="rel_id"),
         "type": "relationship",
         "label": rand.get_random_item(RELATIONSHIP_LABELS)[0],
         "properties": {
@@ -126,8 +126,8 @@ def generate_rels(iterations: int, nodes: dict) -> list:
     for relationship in relationships:
         relationship.update(
             {
-                "start": {"id": rand.get_random_item(nodes_ids)},
-                "end": {"id": rand.get_random_item(nodes_ids)},
+                "start": {"Id": rand.get_random_item(nodes_ids)},
+                "end": {"Id": rand.get_random_item(nodes_ids)},
             }
         )
     return relationships
@@ -156,32 +156,27 @@ def iterate_generate_1node_and_1rel(
         node = entities.create(iterations=1)
         node = node[0][next(iter(node[0]))]
         node["properties"].update(
-            {"id": node["id"], "_creation_timestamp": _date}
+            {"Id": node["Id"], "_creation_timestamp": _date}
         )
-        nodes.update({node["id"]: node})
+        nodes.update({node["Id"]: node})
 
         rel = generate_rels(iterations=1, nodes=nodes)
         rel = rel[0]
-        rel["end"]["id"] = node["id"]
-        rel["properties"].update({"id": rel["id"], "_creation_timestamp": _date})
+        rel["end"]["Id"] = node["Id"]
+        rel["properties"].update({"Id": rel["Id"], "_creation_timestamp": _date})
         relationships.append(rel)
 
-        graph.create_kind_node(
+        graph.create_node(
             kind=node["labels"][0],
-            immutable_properties={
-                "name": node["properties"].pop("name"),
-                "id": node["properties"].pop("id"),
-            },
+            id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],
         )
         graph.create_relationship(
-            kind_a=nodes[rel["start"]["id"]]["labels"][0],
-            filter_a=rel["start"],
-            relationship=rel["label"],
+            id_a=rel["start"]["Id"],
+            relationship_kind=rel["label"],
             rel_properties=rel["properties"],
-            kind_b=nodes[rel["end"]["id"]]["labels"][0],
-            filter_b=rel["end"],
+            id_b=rel["end"]["Id"],
             create_date=rel["properties"]["_creation_timestamp"],
         )
         yield nodes, relationships
@@ -222,22 +217,19 @@ def fake_update(
                 for item in new_properties:
                     properties_dict.update(item)
                 graph.update_node(
-                    kind=nodes[node_id]["labels"][0],
+                    id_=node_id,
                     updates=properties_dict,
-                    properties_filter={"id": node_id},
                     change_date=_date,
                 )
             else:
                 rel = rand.get_random_item(relationships)
                 new_property = relationship_properties.create(iterations=1)[0]
                 graph.update_relationship(
-                    relationship=rel["label"],
+                    relationship_kind=rel["label"],
                     updates=new_property,
                     change_date=_date,
-                    kind_a=nodes[rel["start"]["id"]]["labels"][0],
-                    kind_b=nodes[rel["end"]["id"]]["labels"][0],
-                    filter_a={"id": rel["start"]["id"]},
-                    filter_b={"id": rel["end"]["id"]},
+                    id_a=rel["start"]["Id"],
+                    id_b=rel["end"]["Id"],
                 )
         elif operation == "generate":
             nodes, relationships = next(generator)
@@ -274,27 +266,22 @@ def generate_specific_amount_of_data(
     for node in nodes:
         node = node[next(iter(node))]
         node["properties"].update(
-            {"id": node["id"], "_creation_timestamp": _date}
+            {"Id": node["Id"], "_creation_timestamp": _date}
         )
-        graph.create_kind_node(
+        graph.create_node(
             kind=node["labels"][0],
-            immutable_properties={
-                "name": node["properties"].pop("name"),
-                "id": node["properties"].pop("id"),
-            },
+            id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],
         )
     for rel in relationships:
         _date += interval_in_days
-        rel["properties"].update({"id": rel["id"], "_creation_timestamp": _date})
+        rel["properties"].update({"Id": rel["Id"], "_creation_timestamp": _date})
         graph.create_relationship(
-            kind_a=nodes_dict[rel["start"]["id"]]["labels"][0],
-            filter_a=rel["start"],
-            relationship=rel["label"],
+            id_a=rel["start"]["Id"],
+            relationship_kind=rel["label"],
             rel_properties=rel["properties"],
-            kind_b=nodes_dict[rel["end"]["id"]]["labels"][0],
-            filter_b=rel["end"],
+            id_b=rel["end"]["Id"],
             create_date=rel["properties"]["_creation_timestamp"],
         )
     return nodes_dict, relationships
