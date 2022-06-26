@@ -145,6 +145,23 @@ def patch_property_query(
     return query, updated_updates
 
 
+def remove_properties_query(var_name: str, property_kinds: list) -> str:
+    """Prepares and sanitizes CYPHER REMOVE query.
+
+    Should be used together with match_query.
+
+    Args:
+       var_name: variable name which CYPHER will use to identify the match
+       property_kinds: property keys to be deleted
+    Returns:
+       query string
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    properties_kinds = [sanitize_alphanumeric(kind) for kind in property_kinds]
+    query = f"REMOVE {var_name}.{f', {var_name}.'.join(properties_kinds)}"
+    return query
+
+
 def create_relationship_query(
     var_name_a: str,
     relationship_kind: str,
@@ -296,3 +313,43 @@ def with_query(var_names: list) -> str:
 
     query = query + var_names_str
     return query
+
+
+def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
+    """Prepares and sanitize WHERE CYPHER query to add a constraint on internal id to the
+       patterns in a MATCH clause.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      value: the internal id value to match on
+
+    Returns:
+      query the CYPHER instruction form: WHERE id(var_name) = value
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    assert isinstance(value, int), "internal id value should be int"
+
+    query = f"WHERE id({var_name}) = {value}"
+    return query
+
+
+def get_current_state_query(var_name: str) -> str:
+    """Prepares and sanitizes versioner's get_current_state node query.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node RETURN node"
+
+    return query
+

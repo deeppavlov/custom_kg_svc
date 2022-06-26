@@ -2,6 +2,7 @@ from typing import Optional
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
+import neo4j
 from kg_api.utils.settings import OntologySettings
 import kg_api.core.querymaker as querymaker
 
@@ -95,6 +96,40 @@ def update_node(
         db.cypher_query(query, params)
     else:
         logging.error("There isn't such a node to be updated")
+
+
+def delete_properties_from_node(
+        id_: str,
+        property_kinds: list,
+        change_date: Optional[datetime.datetime] = None,
+    ):
+    """Deletes a property from a given entity.
+
+    Args:
+       id_: entity id
+       property_kinds: property keys to be deleted
+       change_date: the date of node updating
+
+    Returns:
+
+    """
+    current_state = get_current_state(id_)
+    if not current_state:
+        logging.warning("No property was removed. No found node with the specified id")
+        return
+
+    updates = {property_:"" for property_ in property_kinds}
+    update_node(id_, updates, change_date)
+
+    new_current_state = get_current_state(id_)
+
+    match_state, id_updated = querymaker.match_node_query("state", "State")
+    where_state = querymaker.where_node_internal_id_equal_to("state", new_current_state.id)
+    remove_state = querymaker.remove_properties_query("state", property_kinds)
+
+    query = "\n".join([match_state, where_state, remove_state])
+
+    db.cypher_query(query, id_updated)
 
 
 def delete_node(
@@ -303,6 +338,29 @@ def delete_relationship(
         params = {**filter_a, **filter_b}
 
         db.cypher_query(query, params)
+
+
+def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
+    """Retrieves the current State node: by a given Entity node.
+
+    Args:
+      kind: node kind
+      properties_filter: node keyword properties for matching
+
+    Returns:
+      The "current" node
+
+    """
+    match_query, params = querymaker.match_node_query("s", properties_filter={"Id":id_})
+    get_query = querymaker.get_current_state_query("s")
+
+    query = "\n".join([match_query, get_query])
+    node, _ = db.cypher_query(query, params)
+    if node:
+        [[node]] = node
+        return node
+    else:
+        return None
 
 
 ontology_settings = OntologySettings()
