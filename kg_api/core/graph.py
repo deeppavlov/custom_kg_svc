@@ -232,8 +232,14 @@ def search_relationships(
         var_name_2 = "destination"
 
     match_a, match_b = [""] * 2
-    match_a, filter_a = querymaker.match_node_query(var_name_1, properties_filter={"Id": id_a})
-    match_b, filter_b = querymaker.match_node_query(var_name_2, properties_filter={"Id": id_b})
+    a_properties_filter = {}
+    b_properties_filter = {}
+    if id_a:
+        a_properties_filter = {"Id": id_a}
+    if id_b:
+        b_properties_filter = {"Id": id_b}
+    match_a, filter_a = querymaker.match_node_query(var_name_1, properties_filter=a_properties_filter)
+    match_b, filter_b = querymaker.match_node_query(var_name_2, properties_filter=b_properties_filter)
     rel_query, rel_properties_filter = querymaker.match_relationship_query(
         "a", "r", relationship_kind, rel_properties_filter, "b"
     )
