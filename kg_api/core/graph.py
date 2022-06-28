@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
@@ -38,19 +38,23 @@ def create_node(
 
     db.cypher_query(query, params)
 
-
-def get_node_by_id(
-    id_: str)
-    """Looks up for and return a node with a given id.
+# Needed for batch operations.
+def get_nodes_by_id(
+    list_of_ids: list)
+    """Looks up for and return nodes with given ids.
 
     Args:
-      id_: node id
+      list_of_ids: list of nodes ids
     
     Returns:
-      Node in case of success or None otherwise.
+      List of nodes.
     """
 
 
+# it would be useful to add support for hierarchical ontological search, e.g.: user can specify "Kind" as 
+# "DP_Kinds_Kind" (which is a super generic thing), and then we should return all nodes whose "Kind" is 
+# either set as "DP_Kinds_Kind" or is its child (direct or indirect), and that should be a parameter
+# e.g., "filter_by_children_kinds". By default it could be set to False.
 def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
     """Searches existing nodes.
 
@@ -73,7 +77,7 @@ def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit
     return nodes
 
 
-def create_or_update_property_to_node(
+def create_or_update_property_of_node(
     id_: str,
     property_kind: str,
     property_value,
@@ -96,7 +100,15 @@ def create_or_update_property_to_node(
     return update_node(id_, updates_dict, change_date)
 
 
-def update_node(
+def create_or_update_properties_of_nodes(
+    list_of_ids: list,
+    updates: List[list],
+    change_date: Optional[datetime.datetime] = None,
+)
+# to implement
+
+
+def create_or_update_properties_of_node(
     id_: str,
     updates: dict,
     change_date: Optional[datetime.datetime] = None,
