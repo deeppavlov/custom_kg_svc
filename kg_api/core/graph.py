@@ -39,6 +39,18 @@ def create_node(
     db.cypher_query(query, params)
 
 
+def get_node_by_id(
+    id_: str)
+    """Looks up for and return a node with a given id.
+
+    Args:
+      id_: node id
+    
+    Returns:
+      Node in case of success or None otherwise.
+    """
+
+
 def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
     """Searches existing nodes.
 
