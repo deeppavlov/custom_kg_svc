@@ -61,6 +61,29 @@ def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit
     return nodes
 
 
+def create_or_update_property_to_node(
+    id_: str,
+    property_kind: str,
+    property_value,
+    change_date: Optional[datetime.datetime] = None,
+):
+    """Updates a single property of a given node.
+
+    Args:
+      id_: entity id
+      property_kind: kind of the property
+      property_value: value of the property
+
+    Returns:
+    Node in case of success or None in case of error.
+    """
+
+    updates_dict = {}
+    updates_dict[property_kind] = property_value 
+
+    return update_node(id_, updates_dict, change_date)
+
+
 def update_node(
     id_: str,
     updates: dict,
@@ -74,7 +97,7 @@ def update_node(
       change_date: the date of node updating
 
     Returns:
-
+    Node in case of success or None in case of error. 
     """
     properties_filter = {"Id": id_}
     if change_date is None:
@@ -96,6 +119,27 @@ def update_node(
         db.cypher_query(query, params)
     else:
         logging.error("There isn't such a node to be updated")
+
+
+def remove_property_from_node(
+    id_: str,
+    property_kind: str,
+    change_date: Optional[datetime.datetime] = None,
+):
+    """Removes a single property from a given node.
+
+    Args:
+      id_: entity id
+      property_kind: kind of the property
+
+    Returns:
+    Node in case of success or None in case of error.
+    """
+
+    property_kinds_list = []
+    property_kinds_list.append(property_kind) 
+
+    return delete_properties_from_node(id_, property_kinds_list, change_date)
 
 
 def delete_properties_from_node(
@@ -171,7 +215,7 @@ def create_relationship(
     id_b: str,
     create_date: Optional[datetime.datetime] = None,
 ):
-    """Finds nodes A and B and set a relationship between them.
+    """Finds nodes A and B and set a relationship between them. Direction is from node A to node B.
 
     Args:
       id_a: id of entity A
