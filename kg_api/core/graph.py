@@ -38,6 +38,7 @@ def create_node(
 
     db.cypher_query(query, params)
 
+
 # Needed for batch operations.
 def get_nodes_by_id(
     list_of_ids: list)
