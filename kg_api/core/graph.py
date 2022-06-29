@@ -71,8 +71,9 @@ def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit
     if properties_filter is None:
         properties_filter = {}
     match_a, filter_a = querymaker.match_node_query("a", kind, properties_filter)
-    return_ = f"RETURN a\n LIMIT {limit}"
-    query = "\n".join([match_a, return_])
+    return_a = querymaker.return_nodes_or_relationships_query(["a"])
+    limit_a = querymaker.limit_query(limit)
+    query = "\n".join([match_a, return_a, limit_a])
 
     nodes, _ = db.cypher_query(query, filter_a)
     return nodes
@@ -195,10 +196,12 @@ def delete_properties_from_node(
     match_state, id_updated = querymaker.match_node_query("state", "State")
     where_state = querymaker.where_node_internal_id_equal_to("state", new_current_state.id)
     remove_state = querymaker.remove_properties_query("state", property_kinds)
+    return_state = querymaker.return_nodes_or_relationships_query(["state"])
 
-    query = "\n".join([match_state, where_state, remove_state])
+    query = "\n".join([match_state, where_state, remove_state, return_state])
 
-    db.cypher_query(query, id_updated)
+    [[*properties]], _ = db.cypher_query(query, id_updated)
+    return properties
 
 
 def delete_node(
@@ -313,9 +316,12 @@ def search_relationships(
         "a", "r", relationship_kind, rel_properties_filter, "b"
     )
 
-    return_ = f"RETURN source, r, destination\nLIMIT {limit}"
+    return_ = querymaker.return_nodes_or_relationships_query(
+        ["source", "r", "destination"]
+    )
+    limit_ = querymaker.limit_query(limit)
 
-    query = "\n".join([match_a, match_b, rel_query, return_])
+    query = "\n".join([match_a, match_b, rel_query, return_, limit_])
     params = {**filter_a, **filter_b, **rel_properties_filter}
 
     if programmer:

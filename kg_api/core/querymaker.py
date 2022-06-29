@@ -162,6 +162,32 @@ def remove_properties_query(var_name: str, property_kinds: list) -> str:
     return query
 
 
+def return_nodes_or_relationships_query(var_names: list):
+    """Prepares a RETURN CYPHER query to return nodes/relationships.
+
+    Should be used together with match_query.
+
+    Args:
+      var_names: A list of variable names which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    query = f"RETURN {', '.join(var_names)}"
+
+    return query
+
+
+def limit_query(max_limit: int):
+    """Prepares CYPHER LIMIT query.
+    """
+    assert isinstance(max_limit, int)
+    query = f"LIMIT {max_limit}"
+    return query
+
+
 def create_relationship_query(
     var_name_a: str,
     relationship_kind: str,
