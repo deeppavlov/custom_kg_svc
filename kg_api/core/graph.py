@@ -12,19 +12,19 @@ def drop_database():
     clear_neo4j_database(db)
 
 
-def create_node(
+def create_entity(
     kind: str,
     id_: str,
     state_properties: dict,
     create_date: Optional[datetime.datetime] = None,
 ):
-    """Creates new node.
+    """Creates new entity.
 
     Args:
-      kind: node kind
+      kind: entity kind
       id_: Entity id
       state_properties: A Map representing the Entity state properties (mutable).
-      create_date: node creation date
+      create_date: entity creation date
 
     Returns:
 
@@ -32,7 +32,7 @@ def create_node(
     if create_date is None:
         create_date = datetime.datetime.now()
     immutable_properties = {"Id": id_}
-    query, params = querymaker.init_node_query(
+    query, params = querymaker.init_entity_query(
         kind, immutable_properties, state_properties, create_date
     )
 
@@ -40,15 +40,15 @@ def create_node(
 
 
 # Needed for batch operations.
-def get_nodes_by_id(
-    list_of_ids: list)
-    """Looks up for and return nodes with given ids.
+def get_entities_by_id(
+    list_of_ids: list):
+    """Looks up for and return entities with given ids.
 
     Args:
-      list_of_ids: list of nodes ids
+      list_of_ids: list of entities ids
     
     Returns:
-      List of nodes.
+      List of entities.
     """
 
 
@@ -79,13 +79,13 @@ def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit
     return nodes
 
 
-def create_or_update_property_of_node(
+def create_or_update_property_of_entity(
     id_: str,
     property_kind: str,
     property_value,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Updates a single property of a given node.
+    """Updates a single property of a given entity.
 
     Args:
       id_: entity id
@@ -99,28 +99,27 @@ def create_or_update_property_of_node(
     updates_dict = {}
     updates_dict[property_kind] = property_value 
 
-    return update_node(id_, updates_dict, change_date)
+    return create_or_update_properties_of_entity(id_, updates_dict, change_date)
 
 
-def create_or_update_properties_of_nodes(
+def create_or_update_properties_of_entities(
     list_of_ids: list,
     updates: List[list],
     change_date: Optional[datetime.datetime] = None,
 )
 # to implement
 
-
-def create_or_update_properties_of_node(
+def create_or_update_properties_of_entity(
     id_: str,
     updates: dict,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Updates and Adds node properties.
+    """Updates and Adds entity properties.
 
     Args:
       id_: entity id
       updates: new properties and updated properties
-      change_date: the date of node updating
+      change_date: the date of entity updating
 
     Returns:
     Node in case of success or None in case of error. 
@@ -144,15 +143,15 @@ def create_or_update_properties_of_node(
         query = "\n".join([match_a, with_, set_query])
         db.cypher_query(query, params)
     else:
-        logging.error("There isn't such a node to be updated")
+        logging.error("There isn't such an entity to be updated")
 
 
-def remove_property_from_node(
+def remove_property_from_entity(
     id_: str,
     property_kind: str,
     change_date: Optional[datetime.datetime] = None,
 ):
-    """Removes a single property from a given node.
+    """Removes a single property from a given entity.
 
     Args:
       id_: entity id
@@ -165,10 +164,10 @@ def remove_property_from_node(
     property_kinds_list = []
     property_kinds_list.append(property_kind) 
 
-    return delete_properties_from_node(id_, property_kinds_list, change_date)
+    return delete_properties_from_entity(id_, property_kinds_list, change_date)
 
 
-def delete_properties_from_node(
+def delete_properties_from_entity(
         id_: str,
         property_kinds: list,
         change_date: Optional[datetime.datetime] = None,
@@ -185,11 +184,11 @@ def delete_properties_from_node(
     """
     current_state = get_current_state(id_)
     if not current_state:
-        logging.warning("No property was removed. No found node with the specified id")
+        logging.warning("No property was removed. No entity with specified id was found")
         return
 
     updates = {property_:"" for property_ in property_kinds}
-    update_node(id_, updates, change_date)
+    create_or_update_properties_of_entity(id_, updates, change_date)
 
     new_current_state = get_current_state(id_)
 
@@ -204,19 +203,19 @@ def delete_properties_from_node(
     return properties
 
 
-def delete_node(
+def delete_entity(
     id_: str,
     completely=False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
-    """Deletes a node completely from database or make it a thing of the past.
+    """Deletes an entity completely from database or make it a thing of the past.
 
     Args:
       id_: entity id
-      completely: if True, then the node will be deleted completely from DB
-                  with all its relationships. If False, the node will be marked
+      completely: if True, then the entity will be deleted completely from DB
+                  with all its relationships. If False, the entity will be marked
                   as deleted by the _deleted property.
-      deletion_date: the date of node deletion
+      deletion_date: the date of entity deletion
 
     Returns:
 
@@ -233,7 +232,9 @@ def delete_node(
 
         db.cypher_query(query, params)
     else:
-        update_node(properties_filter["Id"], {"_deleted": True}, deletion_date)
+        return create_or_update_properties_of_entity(
+            properties_filter["Id"], {"_deleted": True}, deletion_date
+        )
 
 
 def create_relationship(
@@ -243,7 +244,9 @@ def create_relationship(
     id_b: str,
     create_date: Optional[datetime.datetime] = None,
 ):
-    """Finds nodes A and B and set a relationship between them. Direction is from node A to node B.
+    """Finds entities A and B and set a relationship between them.
+
+    Direction is from entity A to entity B.
 
     Args:
       id_a: id of entity A
@@ -378,7 +381,7 @@ def delete_relationship(
     completely: bool = False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
-    """Deletes a relationship between two nodes A and B.
+    """Deletes a relationship between two entities A and B.
 
     Args:
       relationship_kind: relationship type
@@ -425,8 +428,7 @@ def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
     """Retrieves the current State node: by a given Entity node.
 
     Args:
-      kind: node kind
-      properties_filter: node keyword properties for matching
+      id_ : Entity id
 
     Returns:
       The "current" node

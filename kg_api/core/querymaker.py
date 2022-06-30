@@ -27,19 +27,19 @@ def sanitize_dict_keys(input_value: dict):
     return {sanitize_alphanumeric(k): v for k, v in input_value.items()}
 
 
-def init_node_query(
+def init_entity_query(
     kind: str,
     immutable_properties: dict,
     state_properties: dict,
     create_date: datetime.datetime,
 ) -> Tuple[str, dict]:
-    """Prepares and sanitizes graph.versioner.init CYPHER query for node creation.
+    """Prepares and sanitizes graph.versioner.init CYPHER query for entity creation.
 
     Args:
-      kind: node kind
+      kind: entity kind
       immutable_properties: A Map representing the Entity immutable properties.
       state_properties: A Map representing the Entity state properties (mutable).
-      create_date: node creation date
+      create_date: entity creation date
 
     Returns:
       query string, disambiguated property labels
@@ -163,7 +163,7 @@ def remove_properties_query(var_name: str, property_kinds: list) -> str:
 
 
 def return_nodes_or_relationships_query(var_names: list):
-    """Prepares a RETURN CYPHER query to return nodes/relationships.
+    """Prepares a RETURN CYPHER query to return entities/relationships.
 
     Should be used together with match_query.
 
