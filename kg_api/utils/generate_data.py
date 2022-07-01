@@ -166,7 +166,7 @@ def iterate_generate_1node_and_1rel(
         rel["properties"].update({"Id": rel["Id"], "_creation_timestamp": _date})
         relationships.append(rel)
 
-        graph.create_node(
+        graph.create_entity(
             kind=node["labels"][0],
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
@@ -216,7 +216,7 @@ def fake_update(
                 properties_dict = {}
                 for item in new_properties:
                     properties_dict.update(item)
-                graph.update_node(
+                graph.create_or_update_properties_of_entity(
                     id_=node_id,
                     updates=properties_dict,
                     change_date=_date,
@@ -268,7 +268,7 @@ def generate_specific_amount_of_data(
         node["properties"].update(
             {"Id": node["Id"], "_creation_timestamp": _date}
         )
-        graph.create_node(
+        graph.create_entity(
             kind=node["labels"][0],
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],

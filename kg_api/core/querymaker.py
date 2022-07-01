@@ -140,7 +140,6 @@ def patch_property_query(
         localdatetime("{change_date_str}")
     )
     YIELD node
-    RETURN node
     """
     return query, updated_updates
 
@@ -296,7 +295,6 @@ def delete_relationship_query(
         {var_name_a}, {var_name_b}, "{relationship_kind}", localdatetime("{change_date_str}")
     )
     YIELD result
-    RETURN result
     """
     return query
 
@@ -363,7 +361,7 @@ def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
 
 
 def get_current_state_query(var_name: str) -> str:
-    """Prepares and sanitizes versioner's get_current_state node query.
+    """Prepares and sanitizes versioner's get_current_state_node query.
 
     Should be used together with match_query.
 
@@ -375,7 +373,7 @@ def get_current_state_query(var_name: str) -> str:
 
     """
     var_name = sanitize_alphanumeric(var_name)
-    query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node RETURN node"
+    query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node"
 
     return query
 

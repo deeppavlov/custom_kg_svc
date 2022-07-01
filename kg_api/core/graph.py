@@ -93,7 +93,8 @@ def create_or_update_property_of_entity(
       property_value: value of the property
 
     Returns:
-    Node in case of success or None in case of error.
+      State node in case of success or None in case of error.
+
     """
 
     updates_dict = {}
@@ -122,7 +123,7 @@ def create_or_update_properties_of_entity(
       change_date: the date of entity updating
 
     Returns:
-    Node in case of success or None in case of error. 
+      State node in case of success or None in case of error.
     """
     properties_filter = {"Id": id_}
     if change_date is None:
@@ -130,8 +131,6 @@ def create_or_update_properties_of_entity(
 
     nodes = search_nodes(properties_filter=properties_filter)
     if nodes:
-        if len(nodes) > 1:
-            logging.info("Updating multiple nodes")
         match_a, properties_filter = querymaker.match_node_query(
             "a", properties_filter=properties_filter
         )
@@ -139,11 +138,17 @@ def create_or_update_properties_of_entity(
         set_query, updated_updates = querymaker.patch_property_query(
             "a", updates, change_date
         )
+        return_ = querymaker.return_nodes_or_relationships_query(["node"])
+
         params = {**properties_filter, **updated_updates}
-        query = "\n".join([match_a, with_, set_query])
-        db.cypher_query(query, params)
+        query = "\n".join([match_a, with_, set_query, return_])
+
+        node, _ = db.cypher_query(query, params)
+        [[node]] = node
+        return node
     else:
         logging.error("There isn't such an entity to be updated")
+        return None
 
 
 def remove_property_from_entity(
@@ -158,7 +163,7 @@ def remove_property_from_entity(
       property_kind: kind of the property
 
     Returns:
-    Node in case of success or None in case of error.
+      State node in case of success or None in case of error.
     """
 
     property_kinds_list = []
@@ -180,7 +185,7 @@ def delete_properties_from_entity(
        change_date: the date of node updating
 
     Returns:
-
+      State node in case of success or None in case of error.
     """
     current_state = get_current_state(id_)
     if not current_state:
@@ -199,8 +204,8 @@ def delete_properties_from_entity(
 
     query = "\n".join([match_state, where_state, remove_state, return_state])
 
-    [[*properties]], _ = db.cypher_query(query, id_updated)
-    return properties
+    [[node]], _ = db.cypher_query(query, id_updated)
+    return node
 
 
 def delete_entity(
@@ -218,11 +223,16 @@ def delete_entity(
       deletion_date: the date of entity deletion
 
     Returns:
+      In case of error: None.
+      In case of success: if completely: returns True, of State node otherwise
 
     """
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
     properties_filter = {"Id": id_}
+    if not search_nodes(properties_filter=properties_filter):
+        logging.error("No such a node to be deleted")
+        return None
     if completely:
         match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
         delete_a = querymaker.delete_query("a")
@@ -231,6 +241,7 @@ def delete_entity(
         params = filter_a
 
         db.cypher_query(query, params)
+        return True
     else:
         return create_or_update_properties_of_entity(
             properties_filter["Id"], {"_deleted": True}, deletion_date
@@ -288,7 +299,7 @@ def search_relationships(
       rel_properties_filter: relationship keyword properties for matching
       id_a: id of entity A
       id_b: id of entity B
-      limit: maximum # nodes returned
+      limit: maximum number of relationships to be returned
       programmer: False for returning the relationship found. True for returning
                   (query, params) of that relationship matching.
 
@@ -380,7 +391,7 @@ def delete_relationship(
     id_b: str,
     completely: bool = False,
     deletion_date: Optional[datetime.datetime] = None,
-):
+) -> Optional[bool]:
     """Deletes a relationship between two entities A and B.
 
     Args:
@@ -393,10 +404,13 @@ def delete_relationship(
       deletion_date: the date of relationship deletion
 
     Returns:
-
+      True if the relationship
     """
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
+    if not search_relationships(relationship_kind, id_a=id_a, id_b=id_b):
+        logging.error("No such a relationship to be deleted")
+        return None
 
     if completely:
         match_relationship, params = search_relationships(
@@ -417,11 +431,13 @@ def delete_relationship(
         delete_query = querymaker.delete_relationship_query(
             "a", relationship_kind, "b", deletion_date
         )
+        return_ = querymaker.return_nodes_or_relationships_query(["result"])
 
-        query = "\n".join([match_a, match_b, delete_query])
+        query = "\n".join([match_a, match_b, delete_query, return_])
         params = {**filter_a, **filter_b}
 
-        db.cypher_query(query, params)
+        result, _ = db.cypher_query(query, params)
+        return result
 
 
 def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
@@ -431,18 +447,20 @@ def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
       id_ : Entity id
 
     Returns:
-      The "current" node
+      The state node that has "CURRENT" relationship with entity
 
     """
     match_query, params = querymaker.match_node_query("s", properties_filter={"Id":id_})
     get_query = querymaker.get_current_state_query("s")
+    return_query = querymaker.return_nodes_or_relationships_query(["node"])
 
-    query = "\n".join([match_query, get_query])
+    query = "\n".join([match_query, get_query, return_query])
     node, _ = db.cypher_query(query, params)
     if node:
         [[node]] = node
         return node
     else:
+        logging.error("No current state was found for the given node")
         return None
 
 
