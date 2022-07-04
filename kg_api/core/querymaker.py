@@ -360,6 +360,27 @@ def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
     return query
 
 
+def where_property_value_in_list_query(var_name:str, property_kind:"str", values:list) -> str:
+    """Prepares and sanitizes WHERE-IN CYPHER query.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      property_kind: Property to filter on
+      values: valid values of property
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    property_kind = sanitize_alphanumeric(property_kind)
+    values = [sanitize_alphanumeric(value) for value in values]
+    query = f"WHERE {var_name}.{property_kind} IN {values}"
+    return query
+
+
 def get_current_state_query(var_name: str) -> str:
     """Prepares and sanitizes versioner's get_current_state_node query.
 

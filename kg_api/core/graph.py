@@ -39,17 +39,47 @@ def create_entity(
     db.cypher_query(query, params)
 
 
+def get_entity_by_id(id_: str) -> Optional[neo4j.graph.Node]: # type: ignore
+    """Looks up for and return entity with given id.
+
+    Args:
+      id_: entity id
+
+    Returns:
+      Entity node.
+
+    """
+    list_of_ids = [id_]
+    entities = get_entities_by_id(list_of_ids)
+    if entities:
+        [[entity]] = entities
+    else:
+        entity = None
+    return entity
+
+
 # Needed for batch operations.
-def get_entities_by_id(
-    list_of_ids: list):
+def get_entities_by_id(list_of_ids: list) -> Optional[List[neo4j.graph.Node]]: # type: ignore
     """Looks up for and return entities with given ids.
 
     Args:
       list_of_ids: list of entities ids
-    
+
     Returns:
-      List of entities.
+      List of entity nodes.
+
     """
+    match_query, _ = querymaker.match_node_query("a")
+    where_query = querymaker.where_property_value_in_list_query("a", "Id", list_of_ids)
+    return_query = querymaker.return_nodes_or_relationships_query(["a"])
+
+    query = "\n".join([match_query, where_query, return_query])
+
+    nodes, _ = db.cypher_query(query)
+    if nodes:
+        return nodes
+    else:
+        return None
 
 
 # it would be useful to add support for hierarchical ontological search, e.g.: user can specify "Kind" as 
