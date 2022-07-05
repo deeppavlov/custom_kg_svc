@@ -218,7 +218,8 @@ def fake_update(
                     properties_dict.update(item)
                 graph.create_or_update_properties_of_entity(
                     id_=node_id,
-                    updates=properties_dict,
+                    list_of_property_kinds=list(properties_dict.keys()),
+                    list_of_property_values=list(properties_dict.values()),
                     change_date=_date,
                 )
             else:

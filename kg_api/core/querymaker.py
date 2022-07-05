@@ -388,7 +388,7 @@ def where_property_value_in_list_query(var_name:str, property_kind:"str", values
     """
     var_name = sanitize_alphanumeric(var_name)
     property_kind = sanitize_alphanumeric(property_kind)
-    values = [sanitize_alphanumeric(value) for value in values]
+    values = [sanitize_id(value) for value in values]
     query = f"WHERE {var_name}.{property_kind} IN {values}"
     return query
 

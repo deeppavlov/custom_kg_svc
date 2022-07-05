@@ -254,8 +254,8 @@ def delete_properties_from_entity(
         logging.warning("No property was removed. No entity with specified id was found")
         return
 
-    updates = {property_:"" for property_ in property_kinds}
-    create_or_update_properties_of_entity(id_, updates, change_date)
+    property_values = [""]*len(property_kinds)
+    create_or_update_properties_of_entity(id_, property_kinds, property_values, change_date)
 
     new_current_state = get_current_state(id_)
 
@@ -305,8 +305,8 @@ def delete_entity(
         db.cypher_query(query, params)
         return True
     else:
-        return create_or_update_properties_of_entity(
-            properties_filter["Id"], {"_deleted": True}, deletion_date
+        return create_or_update_property_of_entity(
+            properties_filter["Id"], "_deleted", True, deletion_date
         )
 
 
