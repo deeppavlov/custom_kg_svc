@@ -517,6 +517,58 @@ def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
         return None
 
 
+def get_entities_state_by_date(list_of_ids: list, date_: str):
+    """Returns the active state nodes on a given date for many entities.
+
+    Args:
+      list_of_ids: Entity ids
+      date_: Date, on which the state is required. Should be of format: "%Y-%m-%dT%H:%M:%S"
+
+    returns:
+      State nodes in case of success or None in case of error.
+    """
+    match_a, node_properties_filter = querymaker.match_node_query("a")
+    where_id = querymaker.where_property_value_in_list_query("a", "Id", list_of_ids)
+    match_r, rel_properties_filter = querymaker.match_relationship_cypher_query(
+        var_name_a="a",
+        var_name_r="has_state",
+        relationship_kind="HAS_STATE",
+        rel_properties_filter={},
+        var_name_b="state",
+    )
+    where_on_date = querymaker.where_state_on_date(date_)
+
+    return_ = querymaker.return_nodes_or_relationships_query(["state"])
+
+    query = "\n".join([match_a, where_id, match_r, where_on_date, return_])
+    params = {**node_properties_filter, **rel_properties_filter}
+
+    state_nodes, _ = db.cypher_query(query, params)
+
+    if state_nodes:
+        return state_nodes
+    else:
+        return None
+
+
+def get_entity_state_by_date(id_: str, date_: str):
+    """Returns the active state node on a given date.
+
+    Args:
+      id_: Entity id
+      date_: Date, on which the state is required. Should be of format: "%Y-%m-%dT%H:%M:%S"
+
+    returns:
+      State node in case of success or None in case of error.
+    """
+    state_nodes = get_entities_state_by_date([id_], date_)
+    if state_nodes:
+        [[state]] = state_nodes
+        return state
+    else:
+        logging.error("No state nod")
+        return None
+
 ontology_settings = OntologySettings()
 
 config.DATABASE_URL = ontology_settings.neo4j_bolt_url

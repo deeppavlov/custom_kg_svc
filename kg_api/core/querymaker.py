@@ -39,6 +39,14 @@ def sanitize_id(input_value: str):
     return "".join(char for char in input_value if char.isalnum() or char in ["_","-"])
 
 
+def verify_date_validity(date_: str):
+    """Verifies that a given date is of format "%Y-%m-%dT%H:%M:%S"."""
+    try:
+        datetime.datetime.strptime(date_, "%Y-%m-%dT%H:%M:%S")
+    except Exception as exp:
+        raise exp
+
+
 def init_entity_query(
     kind: str,
     immutable_properties: dict,
@@ -443,6 +451,25 @@ def where_property_value_in_list_query(var_name:str, property_kind:"str", values
     property_kind = sanitize_alphanumeric(property_kind)
     values = [sanitize_id(value) for value in values]
     query = f"WHERE {var_name}.{property_kind} IN {values}"
+    return query
+
+
+def where_state_on_date(date_: str) -> str:
+    """Prepares a WHERE CYPHER query to add a constraint on startDate and endDate properties
+       of HAS_STATE relationship.
+
+    The constraint is in format: startDate <= date_ <= endDate
+
+    Args:
+      date_: date in format: "%Y-%m-%dT%H:%M:%S"
+
+    Returns:
+      query string
+
+    """
+    verify_date_validity(date_)
+    query = (f"WHERE has_state.startDate <=localdatetime('{date_}')"
+             f" and (has_state.endDate >=localdatetime('{date_}') or has_state.endDate is null)")
     return query
 
 
