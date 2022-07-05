@@ -27,6 +27,18 @@ def sanitize_dict_keys(input_value: dict):
     return {sanitize_alphanumeric(k): v for k, v in input_value.items()}
 
 
+def sanitize_id(input_value: str):
+    """Removes characters which are not letters, numbers, underscore or dash.
+
+    Args:
+      input_value: raw string
+
+    Returns:
+
+    """
+    return "".join(char for char in input_value if char.isalnum() or char in ["_","-"])
+
+
 def init_entity_query(
     kind: str,
     immutable_properties: dict,
