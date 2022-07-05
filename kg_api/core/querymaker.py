@@ -244,7 +244,7 @@ def create_relationship_query(
     return query, updated_rel_properties
 
 
-def match_relationship_query(
+def match_relationship_cypher_query(
     var_name_a: str,
     var_name_r: str,
     relationship_kind: str,
@@ -270,13 +270,66 @@ def match_relationship_query(
     rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter)
-    updated_rel_properties_filter = {f"{k}_{var_name_r}": v for k, v in rel_properties_filter.items()}
+    updated_rel_properties_filter = {
+        f"{k}_{var_name_r}": v for k, v in rel_properties_filter.items()
+    }
     query = (
-        f"MATCH (source)-[:HAS_STATE]->"
-        f"({var_name_a})-[{var_name_r}:{relationship_kind} {{{param_placeholders}}}]->"
-        f"({var_name_b})-[:FOR]->(destination)"
+        f"MATCH ({var_name_a})"
+        f"-[{var_name_r}:{relationship_kind} {{{param_placeholders}}}]->"
+        f"({var_name_b})"
     )
     return query, updated_rel_properties_filter
+
+
+def match_relationship_versioner_query(
+    var_name_a: str,
+    var_name_r: str,
+    relationship_kind: str,
+    rel_properties_filter: dict,
+    var_name_b: str,
+) -> Tuple[str, dict]:
+    """Prepares MATCH query for relationships, taking into consideration versioner
+       nodes and relationship like CURRENT, FOR, etc. that permeate the dataset.
+
+    Args:
+      var_name_r: variable name which CYPHER will use to identify the relationship match
+      var_name_a: variable name which CYPHER will use to identify the first node match
+      var_name_b: variable name which CYPHER will use to identify the second node match
+      relationship_kind: relationship type
+      rel_properties_filter: relationship keyword properties for matching
+
+    Returns:
+      query string, disambiguated parameters dict (parameter keys are
+      renamed from {key} to {key}_{var_name})
+
+    """
+    state_node_query, _ = match_node_query("state", "State")
+    current_rel_query, _ = match_relationship_cypher_query(
+        var_name_a=var_name_a,
+        var_name_r="current",
+        relationship_kind="CURRENT",
+        rel_properties_filter={},
+        var_name_b="state"
+    )
+    r_node_query, _ = match_node_query("r_node", "R")
+    relationship_query, rel_properties_filter = match_relationship_cypher_query(
+        var_name_a="state",
+        var_name_r=var_name_r,
+        relationship_kind=relationship_kind,
+        rel_properties_filter=rel_properties_filter,
+        var_name_b='r_node'
+    )
+    for_rel_query, _ = match_relationship_cypher_query(
+        var_name_a="r_node",
+        var_name_r="for_node",
+        relationship_kind="FOR",
+        rel_properties_filter={},
+        var_name_b=var_name_b,
+    )
+    query = "\n".join([
+        state_node_query, current_rel_query, r_node_query, relationship_query, for_rel_query
+    ])
+    return query, rel_properties_filter
 
 
 def delete_relationship_query(

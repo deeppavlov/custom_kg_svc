@@ -352,7 +352,6 @@ def search_relationships(
     id_b: str = "",
     limit=10,
     programmer=0,
-    by_state_properties: bool = True,
 ) -> list:
     """Searches existing relationships.
 
@@ -372,28 +371,20 @@ def search_relationships(
     if rel_properties_filter is None:
         rel_properties_filter = {}
 
-    if by_state_properties:
-        var_name_1 = "a"
-        var_name_2 = "b"
-    else:
-        var_name_1 = "source"
-        var_name_2 = "destination"
-
-    match_a, match_b = [""] * 2
     a_properties_filter = {}
     b_properties_filter = {}
     if id_a:
         a_properties_filter = {"Id": id_a}
     if id_b:
         b_properties_filter = {"Id": id_b}
-    match_a, filter_a = querymaker.match_node_query(var_name_1, properties_filter=a_properties_filter)
-    match_b, filter_b = querymaker.match_node_query(var_name_2, properties_filter=b_properties_filter)
-    rel_query, rel_properties_filter = querymaker.match_relationship_query(
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter=a_properties_filter)
+    match_b, filter_b = querymaker.match_node_query("b", properties_filter=b_properties_filter)
+    rel_query, rel_properties_filter = querymaker.match_relationship_versioner_query(
         "a", "r", relationship_kind, rel_properties_filter, "b"
     )
 
     return_ = querymaker.return_nodes_or_relationships_query(
-        ["source", "r", "destination"]
+        ["a", "r", "b"]
     )
     limit_ = querymaker.limit_query(limit)
 
