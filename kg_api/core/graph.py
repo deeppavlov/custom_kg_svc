@@ -121,63 +121,95 @@ def create_or_update_property_of_entity(
       id_: entity id
       property_kind: kind of the property
       property_value: value of the property
+      change_date: the date of entity updating
 
     Returns:
       State node in case of success or None in case of error.
 
     """
-
-    updates_dict = {}
-    updates_dict[property_kind] = property_value 
-
-    return create_or_update_properties_of_entity(id_, updates_dict, change_date)
+    nodes = create_or_update_properties_of_entities(
+        [id_], [property_kind], [property_value], change_date
+    )
+    if nodes:
+        [[node]] = nodes
+        return node
+    else:
+        return None
 
 
 def create_or_update_properties_of_entities(
     list_of_ids: list,
-    updates: List[list],
+    list_of_property_kinds:list,
+    list_of_property_values:list,
     change_date: Optional[datetime.datetime] = None,
-)
-# to implement
+):
+    """Updates and Adds properties of entities for batch operations.
+
+    Args:
+      list_of_ids: entities ids
+      list_of_property_kinds: properties kinds to be updated or added
+      list_of_property_values: properties values that correspont respectively to property_kinds
+      change_date: the date of entities updating
+
+    Returns:
+      State nodes in case of success or None in case of error.
+    """
+    if len(list_of_property_kinds) != len(list_of_property_values):
+        logging.error(
+            "Number of property kinds don't correspont properly with number of property "
+            "values. Should be equal"
+        )
+        return None
+
+    if change_date is None:
+        change_date = datetime.datetime.now()
+    updates = dict(zip(list_of_property_kinds, list_of_property_values))
+
+    match_a, _ = querymaker.match_node_query("a")
+    where_a = querymaker.where_property_value_in_list_query("a", "Id", list_of_ids)
+    with_a = querymaker.with_query(["a"])
+    set_query, updated_updates = querymaker.patch_property_query(
+        "a", updates, change_date
+    )
+    return_ = querymaker.return_nodes_or_relationships_query(["node"])
+
+    params = {**updated_updates}
+    query = "\n".join([match_a, where_a, with_a, set_query, return_])
+
+    nodes, _ = db.cypher_query(query, params)
+
+    if nodes:
+        return nodes
+    else:
+        logging.warning("No node has been updated")
+        return None
+
 
 def create_or_update_properties_of_entity(
     id_: str,
-    updates: dict,
+    list_of_property_kinds:list,
+    list_of_property_values:list,
     change_date: Optional[datetime.datetime] = None,
 ):
     """Updates and Adds entity properties.
 
     Args:
       id_: entity id
-      updates: new properties and updated properties
+      list_of_property_kinds: properties kinds to be updated or added
+      list_of_property_values: properties values that correspont respectively to property_kinds
       change_date: the date of entity updating
 
     Returns:
       State node in case of success or None in case of error.
+
     """
-    properties_filter = {"Id": id_}
-    if change_date is None:
-        change_date = datetime.datetime.now()
-
-    nodes = search_nodes(properties_filter=properties_filter)
+    nodes = create_or_update_properties_of_entities(
+        [id_], list_of_property_kinds, list_of_property_values, change_date
+    )
     if nodes:
-        match_a, properties_filter = querymaker.match_node_query(
-            "a", properties_filter=properties_filter
-        )
-        with_ = querymaker.with_query(["a"])
-        set_query, updated_updates = querymaker.patch_property_query(
-            "a", updates, change_date
-        )
-        return_ = querymaker.return_nodes_or_relationships_query(["node"])
-
-        params = {**properties_filter, **updated_updates}
-        query = "\n".join([match_a, with_, set_query, return_])
-
-        node, _ = db.cypher_query(query, params)
-        [[node]] = node
+        [[node]] = nodes
         return node
     else:
-        logging.error("There isn't such an entity to be updated")
         return None
 
 
