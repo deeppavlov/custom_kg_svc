@@ -86,16 +86,16 @@ def get_entities_by_id(list_of_ids: list) -> Optional[List[neo4j.graph.Node]]: #
 # "DP_Kinds_Kind" (which is a super generic thing), and then we should return all nodes whose "Kind" is 
 # either set as "DP_Kinds_Kind" or is its child (direct or indirect), and that should be a parameter
 # e.g., "filter_by_children_kinds". By default it could be set to False.
-def search_nodes(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
-    """Searches existing nodes.
+def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
+    """Searches existing entities.
 
     Args:
-      kind: node kind
-      properties_filter: node keyword properties for matching
+      kind: entity kind
+      properties_filter: entity keyword properties for matching
       limit: maximum number of returned nodes
 
     Returns:
-      neo4j nodes list
+      Entity nodes list
 
     """
     if properties_filter is None:
