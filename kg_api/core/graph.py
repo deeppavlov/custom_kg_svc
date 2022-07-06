@@ -292,7 +292,7 @@ def delete_entity(
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
     properties_filter = {"Id": id_}
-    if not search_nodes(properties_filter=properties_filter):
+    if not search_for_entities(properties_filter=properties_filter):
         logging.error("No such a node to be deleted")
         return None
     if completely:
