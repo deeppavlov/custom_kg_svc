@@ -165,12 +165,18 @@ def iterate_generate_1node_and_1rel(
         rel["end"]["Id"] = node["Id"]
         rel["properties"].update({"Id": rel["Id"], "_creation_timestamp": _date})
         relationships.append(rel)
+        node_kind=node["labels"][0]
+
+        node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
+        while node_parent_kind == node_kind:
+            node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
         graph.create_entity(
             kind=node["labels"][0],
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],
+            parent_kind=node_parent_kind,
         )
         graph.create_relationship(
             id_a=rel["start"]["Id"],

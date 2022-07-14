@@ -1,9 +1,14 @@
+import os
+import pickle
 from typing import Optional, List
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
 import neo4j
+from treelib import Tree
+from treelib.exceptions import NodeIDAbsentError
 from kg_api.utils.settings import OntologySettings
+from kg_api.utils import loader
 import kg_api.core.querymaker as querymaker
 
 
@@ -11,12 +16,63 @@ def drop_database():
     """Clears database."""
     clear_neo4j_database(db)
 
+    ontology_file = "kg_api/database/ontology_graph.pickle"
+    if os.path.exists(ontology_file):
+        os.remove(ontology_file)
+
+
+def create_kind(kind: str, parent: str = "Kind"):
+    """Adds a given kind to the ontology_graph tree.
+
+    Args:
+      kind: kind to be added
+      parent: parent of kind
+    Returns:
+
+    """
+    kind = kind.capitalize()
+    parent = parent.capitalize()
+
+    branch = Tree()
+    branch.create_node(kind, kind)
+
+    tree = loader.load_ontology_graph()
+    if not tree:
+        tree = Tree()
+        tree.create_node("Kind", "Kind")
+
+    try:
+        tree.paste(parent, branch)
+        with open("kg_api/database/ontology_graph.pickle", "wb") as file:
+            pickle.dump(tree, file)
+    except NodeIDAbsentError:
+        create_kind(kind=parent)
+        create_kind(kind=kind, parent=parent)
+        logging.warning("Not-in-database parent '%s'. Has been added as a child of 'Kind'", parent)
+    except ValueError:
+        logging.info(
+            "The '%s' kind exists in database. No new kind has been created", kind
+        )
+
+
+def get_descendant_kinds(kind: str) -> list:
+    """Returns the children kinds of a given kind."""
+    tree = loader.load_ontology_graph()
+    descendants = []
+    if tree:
+        try:
+            descendants = [descendant.tag for descendant in tree.children(kind)]
+        except NodeIDAbsentError:
+            logging.info("Not a known kind: %s", kind)
+    return descendants
+
 
 def create_entity(
     kind: str,
     id_: str,
     state_properties: dict,
     create_date: Optional[datetime.datetime] = None,
+    parent_kind: str = "Kind"
 ):
     """Creates new entity.
 
@@ -25,6 +81,7 @@ def create_entity(
       id_: Entity id
       state_properties: A Map representing the Entity state properties (mutable).
       create_date: entity creation date
+      parent_kind: parent of kind. e.g. Dog -> Animal
 
     Returns:
 
@@ -36,6 +93,7 @@ def create_entity(
         kind, immutable_properties, state_properties, create_date
     )
 
+    create_kind(kind, parent_kind)
     db.cypher_query(query, params)
 
 
@@ -100,10 +158,15 @@ def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None
     """
     if properties_filter is None:
         properties_filter = {}
-    match_a, filter_a = querymaker.match_node_query("a", kind, properties_filter)
+
+    descendant_kinds = get_descendant_kinds(kind)
+    descendant_kinds.append(kind)
+
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
+    where_ = querymaker.where_entity_kind_in_list_query("a", descendant_kinds)
     return_a = querymaker.return_nodes_or_relationships_query(["a"])
     limit_a = querymaker.limit_query(limit)
-    query = "\n".join([match_a, return_a, limit_a])
+    query = "\n".join([match_a, where_, return_a, limit_a])
 
     nodes, _ = db.cypher_query(query, filter_a)
     return nodes

@@ -454,6 +454,27 @@ def where_property_value_in_list_query(var_name:str, property_kind:"str", values
     return query
 
 
+def where_entity_kind_in_list_query(var_name:str, kinds:list) -> str:
+    """Prepares and sanitizes a query to check if any kind in "kinds" is in var_name node kinds.
+
+    Should be
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      kinds: list of kinds to check their equality to the matched node's kind
+
+    Returns
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    kinds = [sanitize_id(kind) for kind in kinds]
+    constraints = [f"'{kind}' in labels({var_name})" for kind in kinds]
+    query = " OR ".join(constraints)
+    query = " ".join(["WHERE", query])
+    return query
+
+
 def where_state_on_date(date_: str) -> str:
     """Prepares a WHERE CYPHER query to add a constraint on startDate and endDate properties
        of HAS_STATE relationship.
