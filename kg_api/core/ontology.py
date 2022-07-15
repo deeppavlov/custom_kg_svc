@@ -1,45 +1,50 @@
+from typing import Optional
 import pickle
 import logging
 from treelib import Tree
-from treelib.exceptions import NodeIDAbsentError
+from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 
 from kg_api.utils import loader
 
 
 
 
-def create_kind(kind: str, parent: str = "Kind"):
+def create_kind(kind: str, parent: str = "Kind", start_tree: Optional[Tree] = None):
     """Adds a given kind to the ontology_graph tree.
 
     Args:
       kind: kind to be added
       parent: parent of kind
+
     Returns:
+      tree object representing the ontology graph after the kind creation
 
     """
     kind = kind.capitalize()
     parent = parent.capitalize()
 
-    branch = Tree()
-    branch.create_node(kind, kind)
+    if start_tree is None:
+        start_tree = loader.load_ontology_graph()
+        if start_tree is None:
+            start_tree = Tree()
+            start_tree.create_node(tag="Kind", identifier="Kind")
+    tree = start_tree
 
-    tree = loader.load_ontology_graph()
-    if not tree:
-        tree = Tree()
-        tree.create_node("Kind", "Kind")
+    parent_node = tree.get_node(parent)
+    if parent_node is None:
+        tree = create_kind(parent, "Kind", tree)
+        logging.warning("Not-in-database parent '%s'. Has been added as a child of 'Kind'", parent)
 
     try:
-        tree.paste(parent, branch)
+        tree.create_node(kind, kind, parent=parent)
         with open("kg_api/database/ontology_graph.pickle", "wb") as file:
             pickle.dump(tree, file)
-    except NodeIDAbsentError:
-        create_kind(kind=parent)
-        create_kind(kind=kind, parent=parent)
-        logging.warning("Not-in-database parent '%s'. Has been added as a child of 'Kind'", parent)
-    except ValueError:
+    except DuplicatedNodeIdError:
         logging.info(
             "The '%s' kind exists in database. No new kind has been created", kind
         )
+
+    return tree
 
 
 def get_descendant_kinds(kind: str) -> list:
