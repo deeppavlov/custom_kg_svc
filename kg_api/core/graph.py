@@ -1,15 +1,12 @@
 import os
-import pickle
 from typing import Optional, List
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
 import neo4j
-from treelib import Tree
-from treelib.exceptions import NodeIDAbsentError
 from kg_api.utils.settings import OntologySettings
-from kg_api.utils import loader
 import kg_api.core.querymaker as querymaker
+import kg_api.core.ontology as ontology
 
 
 def drop_database():
@@ -23,51 +20,6 @@ def drop_database():
     db_ids = "kg_api/database/db_ids.txt"
     if os.path.exists(db_ids):
         os.remove(db_ids)
-
-def create_kind(kind: str, parent: str = "Kind"):
-    """Adds a given kind to the ontology_graph tree.
-
-    Args:
-      kind: kind to be added
-      parent: parent of kind
-    Returns:
-
-    """
-    kind = kind.capitalize()
-    parent = parent.capitalize()
-
-    branch = Tree()
-    branch.create_node(kind, kind)
-
-    tree = loader.load_ontology_graph()
-    if not tree:
-        tree = Tree()
-        tree.create_node("Kind", "Kind")
-
-    try:
-        tree.paste(parent, branch)
-        with open("kg_api/database/ontology_graph.pickle", "wb") as file:
-            pickle.dump(tree, file)
-    except NodeIDAbsentError:
-        create_kind(kind=parent)
-        create_kind(kind=kind, parent=parent)
-        logging.warning("Not-in-database parent '%s'. Has been added as a child of 'Kind'", parent)
-    except ValueError:
-        logging.info(
-            "The '%s' kind exists in database. No new kind has been created", kind
-        )
-
-
-def get_descendant_kinds(kind: str) -> list:
-    """Returns the children kinds of a given kind."""
-    tree = loader.load_ontology_graph()
-    descendants = []
-    if tree:
-        try:
-            descendants = [descendant.tag for descendant in tree.children(kind)]
-        except NodeIDAbsentError:
-            logging.info("Not a known kind: %s", kind)
-    return descendants
 
 
 def is_identical_id(id_: str) -> bool:
@@ -125,7 +77,7 @@ def create_entity(
 
     nodes, _ = db.cypher_query(query, params)
     store_id(id_)
-    create_kind(kind, parent_kind)
+    ontology.create_kind(kind, parent_kind)
 
     if nodes:
         [[entity]] = nodes
@@ -196,7 +148,7 @@ def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None
     if properties_filter is None:
         properties_filter = {}
 
-    descendant_kinds = get_descendant_kinds(kind)
+    descendant_kinds = ontology.get_descendant_kinds(kind)
     descendant_kinds.append(kind)
 
     match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
