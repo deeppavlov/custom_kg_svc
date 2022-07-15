@@ -20,6 +20,9 @@ def drop_database():
     if os.path.exists(ontology_file):
         os.remove(ontology_file)
 
+    db_ids = "kg_api/database/db_ids.txt"
+    if os.path.exists(db_ids):
+        os.remove(db_ids)
 
 def create_kind(kind: str, parent: str = "Kind"):
     """Adds a given kind to the ontology_graph tree.
@@ -67,6 +70,28 @@ def get_descendant_kinds(kind: str) -> list:
     return descendants
 
 
+def is_identical_id(id_: str) -> bool:
+    """Checks if the given id is in the database or not."""
+    ids = []
+    ids_file = "kg_api/database/db_ids.txt"
+    if os.path.exists(ids_file):
+        with open(ids_file, "r+", encoding="utf-8") as file:
+            for line in file:
+                ids.append(line.strip())
+    else:
+        open(ids_file, "w", encoding="utf-8").close()
+    if id_ in ids:
+        return False
+    else:
+        return True
+
+
+def store_id(id_):
+    """Saves the given id to a db_ids file."""
+    with open("kg_api/database/db_ids.txt", "a", encoding="utf-8") as file:
+        file.write(id_ +"\n")
+
+
 def create_entity(
     kind: str,
     id_: str,
@@ -84,17 +109,29 @@ def create_entity(
       parent_kind: parent of kind. e.g. Dog -> Animal
 
     Returns:
-
+      created entity in case of success, None otherwise
     """
     if create_date is None:
         create_date = datetime.datetime.now()
+    if not is_identical_id(id_):
+        logging.error("The same id exists in database")
+        return None
     immutable_properties = {"Id": id_}
     query, params = querymaker.init_entity_query(
         kind, immutable_properties, state_properties, create_date
     )
+    return_ = querymaker.return_nodes_or_relationships_query(["node"])
+    query = "\n".join([query, return_])
 
+    nodes, _ = db.cypher_query(query, params)
+    store_id(id_)
     create_kind(kind, parent_kind)
-    db.cypher_query(query, params)
+
+    if nodes:
+        [[entity]] = nodes
+        return entity
+    else:
+        return None
 
 
 def get_entity_by_id(id_: str) -> Optional[neo4j.graph.Node]: # type: ignore

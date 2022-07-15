@@ -82,7 +82,6 @@ def init_entity_query(
         localdatetime("{create_date_str}")
     )
     YIELD node
-    RETURN node
     """
     return query, params
 
