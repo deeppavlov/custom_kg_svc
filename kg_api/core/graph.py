@@ -47,15 +47,23 @@ def create_entity(
         logging.error("The same id exists in database")
         return None
     immutable_properties = {"Id": id_}
+
+    total_state_properties = {}
+    total_state_properties.update(state_properties)
+    parent_properties = ontology.get_kind_properties(parent_kind)
+    if parent_properties is not None:
+        parent_properties = {property_:"" for property_ in parent_properties}
+        total_state_properties.update(parent_properties)
+
     query, params = querymaker.init_entity_query(
-        kind, immutable_properties, state_properties, create_date
+        kind, immutable_properties, total_state_properties, create_date
     )
     return_ = querymaker.return_nodes_or_relationships_query(["node"])
     query = "\n".join([query, return_])
 
     nodes, _ = db.cypher_query(query, params)
     loader.store_id(id_)
-    ontology.create_kind(kind, parent_kind)
+    ontology.create_kind(kind, parent_kind, kind_properties=set(state_properties.keys()))
 
     if nodes:
         [[entity]] = nodes
