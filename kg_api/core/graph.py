@@ -7,7 +7,7 @@ import neo4j
 from kg_api.utils.settings import OntologySettings
 import kg_api.core.querymaker as querymaker
 import kg_api.core.ontology as ontology
-
+import kg_api.utils.loader as loader
 
 def drop_database():
     """Clears database."""
@@ -20,28 +20,6 @@ def drop_database():
     db_ids = "kg_api/database/db_ids.txt"
     if os.path.exists(db_ids):
         os.remove(db_ids)
-
-
-def is_identical_id(id_: str) -> bool:
-    """Checks if the given id is in the database or not."""
-    ids = []
-    ids_file = "kg_api/database/db_ids.txt"
-    if os.path.exists(ids_file):
-        with open(ids_file, "r+", encoding="utf-8") as file:
-            for line in file:
-                ids.append(line.strip())
-    else:
-        open(ids_file, "w", encoding="utf-8").close()
-    if id_ in ids:
-        return False
-    else:
-        return True
-
-
-def store_id(id_):
-    """Saves the given id to a db_ids file."""
-    with open("kg_api/database/db_ids.txt", "a", encoding="utf-8") as file:
-        file.write(id_ +"\n")
 
 
 def create_entity(
@@ -65,7 +43,7 @@ def create_entity(
     """
     if create_date is None:
         create_date = datetime.datetime.now()
-    if not is_identical_id(id_):
+    if not loader.is_identical_id(id_):
         logging.error("The same id exists in database")
         return None
     immutable_properties = {"Id": id_}
@@ -76,7 +54,7 @@ def create_entity(
     query = "\n".join([query, return_])
 
     nodes, _ = db.cypher_query(query, params)
-    store_id(id_)
+    loader.store_id(id_)
     ontology.create_kind(kind, parent_kind)
 
     if nodes:
