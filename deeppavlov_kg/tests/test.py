@@ -1,6 +1,6 @@
 from datetime import datetime
 
-import kg_api.core.graph as graph
+import deeppavlov_kg.core.graph as graph
 
 
 TEST_USER_ENTITIES = [

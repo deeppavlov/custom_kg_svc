@@ -8,7 +8,7 @@ from mimesis import Generic, Numeric
 from mimesis.locales import Locale
 from mimesis.schema import Field, Schema
 
-import kg_api.core.graph as graph
+import deeppavlov_kg.core.graph as graph
 
 generic = Generic(locale=Locale.EN)
 fabulist = Fabulist()

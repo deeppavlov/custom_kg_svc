@@ -4,20 +4,21 @@ import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
 import neo4j
-from kg_api.utils.settings import OntologySettings
-import kg_api.core.querymaker as querymaker
-import kg_api.core.ontology as ontology
-import kg_api.utils.loader as loader
+from deeppavlov_kg.utils.settings import OntologySettings
+import deeppavlov_kg.core.querymaker as querymaker
+import deeppavlov_kg.core.ontology as ontology
+import deeppavlov_kg.utils.loader as loader
+
 
 def drop_database():
     """Clears database."""
     clear_neo4j_database(db)
 
-    ontology_file = "kg_api/database/ontology_graph.pickle"
+    ontology_file = "deeppavlov_kg/database/ontology_graph.pickle"
     if os.path.exists(ontology_file):
         os.remove(ontology_file)
 
-    db_ids = "kg_api/database/db_ids.txt"
+    db_ids = "deeppavlov_kg/database/db_ids.txt"
     if os.path.exists(db_ids):
         os.remove(db_ids)
 

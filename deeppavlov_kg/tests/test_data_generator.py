@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import datetime
-from kg_api.utils.generate_data import (
+from deeppavlov_kg.utils.generate_data import (
     fake_update,
     generic,
     iterate_generate_1node_and_1rel,
     generate_specific_amount_of_data,
     set_date,
 )
-import kg_api.core.graph as graph
+import deeppavlov_kg.core.graph as graph
 
 NUM_USERS = 1
 NUM_ENTITIES = 3
@@ -40,6 +40,7 @@ def test_update_generated_data(generator, nodes, relationships):
     return fake_update(
         generator, nodes, relationships, NUM_UPDATES, INTERVAL_IN_DAYS
     )
+
 
 set_date(INITIAL_DATE)
 

@@ -4,7 +4,7 @@ import logging
 from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 
-from kg_api.utils import loader
+from deeppavlov_kg.utils import loader
 
 
 class Entity(object):
@@ -66,7 +66,7 @@ def create_kind(
             parent=parent,
             data=Entity(kind_properties),
         )
-        with open("kg_api/database/ontology_graph.pickle", "wb") as file:
+        with open("deeppavlov_kg/database/ontology_graph.pickle", "wb") as file:
             pickle.dump(tree, file)
     except DuplicatedNodeIdError:
         logging.info(
