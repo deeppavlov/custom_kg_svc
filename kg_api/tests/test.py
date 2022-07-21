@@ -6,9 +6,10 @@ import kg_api.core.graph as graph
 TEST_USER_ENTITIES = [
     {
         "immutable": {
-            "name": "Jack Ryan",
+            "Id": "1",
         },
         "mutable": {
+            "name": "Jack Ryan",
             "born": datetime.strptime("1980-06-30", "%Y-%m-%d"),
             "OCEAN_openness": True,
             "OCEAN_conscientiousness": True,
@@ -19,9 +20,10 @@ TEST_USER_ENTITIES = [
     },
     {
         "immutable": {
-            "name": "Sandy Bates",
+            "Id":"2",
         },
         "mutable": {
+            "name": "Sandy Bates",
             "born": "1998-04-10",
             "OCEAN_openness": True,
             "OCEAN_conscientiousness": False,
@@ -33,26 +35,26 @@ TEST_USER_ENTITIES = [
 ]
 
 TEST_BOT_ENTITIES = [
-    {"immutable": {"name": "ChatBot"}, "mutable": {"born": "2020-03-02"}}
+    {"immutable": {"Id": "3"}, "mutable": {"name": "ChatBot", "born": "2020-03-02"}}
 ]
 
 TEST_INTEREST_ENTITIES = [
-    {"immutable": {"name": "Theater"}, "mutable": {}},
-    {"immutable": {"name": "Artificial Intelligence"}, "mutable": {}},
-    {"immutable": {"name": "Sport"}, "mutable": {}},
-    {"immutable": {"name": "Mindfulness"}, "mutable": {}},
-    {"immutable": {"name": "Medicine"}, "mutable": {}},
+    {"immutable": {"Id": "4"}, "mutable": {"name": "Theater"}},
+    {"immutable": {"Id": "5"}, "mutable": {"name": "Artificial Intelligence"}},
+    {"immutable": {"Id": "6"}, "mutable": {"name": "Sport"}},
+    {"immutable": {"Id": "7"}, "mutable": {"name": "Mindfulness"}},
+    {"immutable": {"Id": "8"}, "mutable": {"name": "Medicine"}},
 ]
 
 TEST_HABIT_ENTITIES = [
-    {"immutable": {"name": "Reading"}, "mutable": {"label": "Good"}},
-    {"immutable": {"name": "Yoga"}, "mutable": {"label": "Good"}},
-    {"immutable": {"name": "Alcohol"}, "mutable": {"label": "Bad"}},
-    {"immutable": {"name": "Smoking"}, "mutable": {"label": "Bad"}},
-    {"immutable": {"name": "Dancing"}, "mutable": {}},
+    {"immutable": {"Id": "9"}, "mutable": {"name": "Reading", "label": "Good"}},
+    {"immutable": {"Id": "10"}, "mutable": {"name": "Yoga", "label": "Good"}},
+    {"immutable": {"Id": "11"}, "mutable": {"name": "Alcohol", "label": "Bad"}},
+    {"immutable": {"Id": "12"}, "mutable": {"name": "Smoking", "label": "Bad"}},
+    {"immutable": {"Id": "13"}, "mutable": {"name": "Dancing"}},
 ]
 
-TEST_DISEASE_ENTITIES = [{"immutable": {"name": "Cancer"}, "mutable": {}}]
+TEST_DISEASE_ENTITIES = [{"immutable": {"Id": "14"}, "mutable": {"name": "Cancer"}}]
 
 TEST_ENTITIES = {
     "User": TEST_USER_ENTITIES,
@@ -64,30 +66,26 @@ TEST_ENTITIES = {
 
 TEST_MATCHES = [
     (
-        "Bot",
-        {"name": "ChatBot"},
+        "3",
         "TALKED_WITH",
         {"on": datetime.strptime("2022-01-20", "%Y-%m-%d")},
-        "User",
-        {"name": "Sandy Bates"},
+        "2",
     ),
-    ("Bot", {"name": "ChatBot"}, "TALKED_WITH", {}, "User", {"name": "Jack Ryan"}),
+    ("3", "TALKED_WITH", {}, "1"),
     (
-        "User",
-        {"name": "Sandy Bates"},
+        "2",
         "KEEPS_UP",
         {"since": "March"},
-        "Habit",
-        {"name": "Smoking"},
+        "12",
     ),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Reading"}),
-    ("User", {"name": "Sandy Bates"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
-    ("User", {"name": "Jack Ryan"}, "KEEPS_UP", {}, "Habit", {"name": "Dancing"}),
-    ("User", {"name": "Jack Ryan"}, "LIKES", {}, "Interest", {"name": "Mindfulness"}),
-    ("User", {"name": "Jack Ryan"}, "DISLIKES", {}, "Interest", {"name": "Theater"}),
-    ("Habit", {"name": "Smoking"}, "CAUSES", {}, "Disease", {"name": "Cancer"}),
-    ("Interest", {"name": "Medicine"}, "CURES", {}, "Disease", {"name": "Cancer"}),
-    ("Habit", {"name": "Yoga"}, "RELATED_TO", {}, "Interest", {"name": "Mindfulness"}),
+    ("2", "KEEPS_UP", {}, "9"),
+    ("2", "KEEPS_UP", {}, "13"),
+    ("1", "KEEPS_UP", {}, "13"),
+    ("1", "LIKES", {}, "7"),
+    ("1", "DISLIKES", {}, "4"),
+    ("12", "CAUSES", {}, "14"),
+    ("8", "CURES", {}, "14"),
+    ("10", "RELATED_TO", {}, "7"),
 ]
 
 
@@ -97,35 +95,33 @@ def test_populate(drop=True):
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
-            graph.create_kind_node(
-                kind, entity_dict["immutable"], entity_dict["mutable"]
+            graph.create_entity(
+                kind, entity_dict["immutable"]["Id"], entity_dict["mutable"]
             )
 
-    for kind_a, filter_a, rel, rel_dict, kind_b, filter_b in TEST_MATCHES:
-        graph.create_relationship(kind_a, filter_a, rel, rel_dict, kind_b, filter_b)
+    for id_a, rel, rel_dict, id_b in TEST_MATCHES:
+        graph.create_relationship(id_a, rel, rel_dict,id_b)
 
 
 def test_search():
     print("Search nodes")
-    habits = graph.search_nodes("Habit")
-    bad_habits = graph.search_nodes("Habit", {"label": "Bad"})
+    habits = graph.search_for_entities("Habit")
+    bad_habits = graph.search_for_entities("Habit", {"label": "Bad"})
     for key, value in {"habits": habits, "bad_habits": bad_habits}.items():
         print("\n", key)
         for habit in value:
-            print(habit[0]._properties["name"])
+            print(graph.get_current_state(habit[0].get("Id")).get("name"))
 
     print("Search relationships")
     habits = graph.search_relationships("KEEPS_UP")
     habits_since_march = graph.search_relationships("KEEPS_UP", {"since": "March"})
     sandy_habits = graph.search_relationships(
-        "KEEPS_UP", kind_a="User", filter_a={"name": "Sandy Bates"}
+        "KEEPS_UP", id_a="2"
     )
     sandy_bad_habits = graph.search_relationships(
         "KEEPS_UP",
-        kind_a="User",
-        filter_a={"name": "Sandy Bates"},
-        kind_b="Habit",
-        filter_b={"label": "Bad"},
+        id_a="2",
+        id_b="11",
     )
     for key, value in {
         "habits": habits,
@@ -136,53 +132,53 @@ def test_search():
         print("\n", key)
         for habit in value:
             print(
-                habit[0]._properties["name"],
+                graph.get_current_state(habit[0].get("Id")).get("name"),
                 habit[1].type,
-                habit[1]._properties,
-                habit[2]._properties["name"],
+                dict(habit[1].items()),
+                graph.get_current_state(habit[2].get("Id")).get("name"),
             )
 
 
 def test_update():
-    graph.update_node(
-        "User", {"height": 175, "name": "Jay Ryan"}, properties_filter={"name": "Jack Ryan"}
+    graph.create_or_update_properties_of_entity(
+        id_="1",
+        list_of_property_kinds=["height", "name"],
+        list_of_property_values= [175, "Jay Ryan"],
     )
-    graph.update_node("User", {"country": "Russia"})
+    graph.create_or_update_properties_of_entities(
+        list_of_ids=["1","2"],
+        list_of_property_kinds=["country"],
+        list_of_property_values=["Russia"],
+    )
     # Sandy does all her habits every Friday
     graph.update_relationship(
         "KEEPS_UP",
         {"every": "Friday"},
-        kind_a="User",
-        kind_b="Habit",
-        filter_a={"name": "Sandy Bates"},
+        id_a="2",
+        id_b="10",
     )
     # Sandy started to do her habits, which are since March, as daily routine
     graph.update_relationship(
         "KEEPS_UP",
         updates={"every": "day"},
-        kind_a="User",
-        kind_b="Habit",
-        filter_a={"name": "Sandy Bates"},
+        id_a="2",
+        id_b="9",
     )
     graph.update_relationship(
         "KEEPS_UP",
         updates={"since": "February"},
-        kind_a="User",
-        filter_a={"name": "Sandy Bates"},
-        kind_b="Habit",
-        filter_b={"label": "Good"},
+        id_a="2",
+        id_b="13",
     )
 
 
 def test_delete():
     graph.delete_relationship(
         "KEEPS_UP",
-        kind_a="User",
-        filter_a={"name": "Sandy Bates"},
-        kind_b="Habit",
-        filter_b={"name": "Dancing"},
+        id_a="1",
+        id_b="13",
     )
-    graph.delete_node("User", {"name": "Jack Ryan"}, completely=False)
+    graph.delete_entity("1", completely=False)
 
 
 test_populate()
