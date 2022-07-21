@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 authors = [
-    "Daniel Kornev"
-    "Rami Mahskouk"
+    "Daniel Kornev <daniel@kornevs.org>",
+    "Rami Mahskouk <rami.n.mashkouk@gmail.com>",
     "Maxim Talimanchuk <mtalimanchuk@gmail.com>",
 ]
 
