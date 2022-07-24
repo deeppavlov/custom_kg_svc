@@ -1,5 +1,4 @@
 from typing import Optional
-import pickle
 import logging
 from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
@@ -55,7 +54,7 @@ def create_kind(
     if parent_node is None:
         tree = create_kind(parent, "Kind", tree)
         parent_node = tree.get_node(parent)
-        logging.warning("Not-in-database parent '%s'. Has been added as a child of 'Kind'", parent)
+        logging.warning("Not-in-database kind '%s'. Has been added as a child of 'Kind'", parent)
 
     kind_properties.update(parent_node.data.properties) # type: ignore
 
@@ -66,14 +65,65 @@ def create_kind(
             parent=parent,
             data=Entity(kind_properties),
         )
-        with open("deeppavlov_kg/database/ontology_graph.pickle", "wb") as file:
-            pickle.dump(tree, file)
+        loader.save_ontology_graph(tree)
     except DuplicatedNodeIdError:
         logging.info(
             "The '%s' kind exists in database. No new kind has been created", kind
         )
 
     return tree
+
+
+def get_kind_node(tree: Tree, kind: str):
+    """Searches tree for kind and returns the kind node
+
+    Returns:
+      kind node in case of success, None otherwise
+    """
+    if tree is None:
+        logging.error("Ontology graph is empty")
+        return None
+
+    kind_node = tree.get_node(kind)
+    if kind_node is None:
+        logging.error("Kind '%s' is not in ontology graph", kind)
+        return None
+    return kind_node
+
+
+def remove_kind(kind: str):
+    """Removes kind from database/ontology_graph"""
+    tree = loader.load_ontology_graph()
+    if get_kind_node(tree, kind) is None:
+        return None
+
+    tree.remove_node(kind)
+
+    loader.save_ontology_graph(tree)
+    logging.info("Kind '%s' has been removed successfully from ontology graph", kind)
+
+
+def update_properties_of_kind(kind: str, old_properties: list, new_properties: list):
+    """Updates a list of properties of a given kind
+
+    Returns:
+      kind node in case of success, None otherwise
+    """
+    tree = loader.load_ontology_graph()
+    kind_node = get_kind_node(tree, kind)
+    if kind_node is None:
+        return None
+
+    for idx, prop in enumerate(old_properties):
+        if prop in kind_node.data.properties:
+            kind_node.data.properties.remove(prop)
+            kind_node.data.properties.add(new_properties[idx])
+        else:
+            logging.error("Property '%s' is not in '%s' properties", prop, kind)
+            return None
+
+    loader.save_ontology_graph(tree)
+    logging.info("Properties has been updated successfully")
 
 
 def get_descendant_kinds(kind: str) -> list:
@@ -84,17 +134,17 @@ def get_descendant_kinds(kind: str) -> list:
         try:
             descendants = [descendant.tag for descendant in tree.children(kind)]
         except NodeIDAbsentError:
-            logging.info("Not a known kind: %s", kind)
+            logging.error("Kind '%s' is not in ontology graph", kind)
+            return None
     return descendants
 
 
 def get_kind_properties(kind: str) -> Optional[set]:
     """Returns the kind properties, stored in ontology graph"""
     tree = loader.load_ontology_graph()
-    if tree is not None:
-        kind_node = tree.get_node(kind)
-        if kind_node is not None:
-            return kind_node.data.properties
+    kind_node = get_kind_node(tree, kind)
+    if kind_node is not None:
+        return kind_node.data.properties
     return None
 
 

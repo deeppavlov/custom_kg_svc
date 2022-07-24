@@ -14,6 +14,12 @@ def load_ontology_graph() -> Optional[treelib.Tree]:
     return tree
 
 
+def save_ontology_graph(tree: treelib.Tree):
+    """Uploads tree to database/ontology_graph.pickle."""
+    with open("deeppavlov_kg/database/ontology_graph.pickle", "wb") as file:
+        pickle.dump(tree, file)
+
+
 def is_identical_id(id_: str) -> bool:
     """Checks if the given id is in the database or not."""
     ids = []
