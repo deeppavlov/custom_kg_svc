@@ -387,8 +387,11 @@ def search_relationships(
     rel_properties_filter: Optional[dict] = None,
     id_a: str = "",
     id_b: str = "",
+    kind_a: str = "",
+    kind_b: str = "",
     limit=10,
     programmer=0,
+    search_all_states=False,
 ) -> list:
     """Searches existing relationships.
 
@@ -414,14 +417,15 @@ def search_relationships(
         a_properties_filter = {"Id": id_a}
     if id_b:
         b_properties_filter = {"Id": id_b}
-    match_a, filter_a = querymaker.match_node_query("a", properties_filter=a_properties_filter)
-    match_b, filter_b = querymaker.match_node_query("b", properties_filter=b_properties_filter)
+    state_relationship_kind = "HAS_STATE" if search_all_states else "CURRENT"
+    match_a, filter_a = querymaker.match_node_query("a", kind=kind_a, properties_filter=a_properties_filter)
+    match_b, filter_b = querymaker.match_node_query("b", kind=kind_b, properties_filter=b_properties_filter)
     rel_query, rel_properties_filter = querymaker.match_relationship_versioner_query(
-        "a", "r", relationship_kind, rel_properties_filter, "b"
+        "a", "r", relationship_kind, rel_properties_filter, "b", state_relationship_kind
     )
 
     return_ = querymaker.return_nodes_or_relationships_query(
-        ["a", "r", "b"]
+        ["a", state_relationship_kind.lower(), "state", "r", "b"]
     )
     limit_ = querymaker.limit_query(limit)
 

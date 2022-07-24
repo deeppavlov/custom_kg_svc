@@ -294,6 +294,7 @@ def match_relationship_versioner_query(
     relationship_kind: str,
     rel_properties_filter: dict,
     var_name_b: str,
+    state_relationship_kind: str,
 ) -> Tuple[str, dict]:
     """Prepares MATCH query for relationships, taking into consideration versioner
        nodes and relationship like CURRENT, FOR, etc. that permeate the dataset.
@@ -313,8 +314,8 @@ def match_relationship_versioner_query(
     state_node_query, _ = match_node_query("state", "State")
     current_rel_query, _ = match_relationship_cypher_query(
         var_name_a=var_name_a,
-        var_name_r="current",
-        relationship_kind="CURRENT",
+        var_name_r=state_relationship_kind.lower(),
+        relationship_kind=state_relationship_kind,
         rel_properties_filter={},
         var_name_b="state"
     )
