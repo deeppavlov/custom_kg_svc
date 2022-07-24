@@ -28,7 +28,6 @@ def create_entity(
     id_: str,
     state_properties: dict,
     create_date: Optional[datetime.datetime] = None,
-    parent_kind: str = "Kind"
 ):
     """Creates new entity.
 
@@ -47,24 +46,17 @@ def create_entity(
     if not loader.is_identical_id(id_):
         logging.error("The same id exists in database")
         return None
+    if not ontology.are_properties_in_kind(state_properties, kind):
+        return None
     immutable_properties = {"Id": id_}
-
-    total_state_properties = {}
-    total_state_properties.update(state_properties)
-    parent_properties = ontology.get_kind_properties(parent_kind)
-    if parent_properties is not None:
-        parent_properties = {property_:"" for property_ in parent_properties}
-        total_state_properties.update(parent_properties)
-
     query, params = querymaker.init_entity_query(
-        kind, immutable_properties, total_state_properties, create_date
+        kind, immutable_properties, state_properties, create_date
     )
     return_ = querymaker.return_nodes_or_relationships_query(["node"])
     query = "\n".join([query, return_])
 
     nodes, _ = db.cypher_query(query, params)
     loader.store_id(id_)
-    ontology.create_kind(kind, parent_kind, kind_properties=set(state_properties.keys()))
 
     if nodes:
         [[entity]] = nodes
@@ -203,6 +195,12 @@ def create_or_update_properties_of_entities(
     if change_date is None:
         change_date = datetime.datetime.now()
     updates = dict(zip(list_of_property_kinds, list_of_property_values))
+
+    for id in list_of_ids:
+        kinds_frozenset = get_entity_by_id(id).labels
+        kind = next(iter(kinds_frozenset))
+        if not ontology.are_properties_in_kind(list_of_property_kinds, kind):
+            return None
 
     match_a, _ = querymaker.match_node_query("a")
     where_a = querymaker.where_property_value_in_list_query("a", "Id", list_of_ids)

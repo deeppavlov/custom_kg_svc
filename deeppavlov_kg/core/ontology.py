@@ -96,3 +96,16 @@ def get_kind_properties(kind: str) -> Optional[set]:
         if kind_node is not None:
             return kind_node.data.properties
     return None
+
+
+def are_properties_in_kind(list_of_property_kinds, kind):
+    """Checks if all the properties in the list are in fact properties of 'kind' in 
+    the ontology graph.
+    """
+    kind_properties = get_kind_properties(kind)
+    for prop in list_of_property_kinds:
+        if prop not in kind_properties:
+            logging.error("""The property '%s' isn't in '%s' properties in ontology graph.
+                Use create_or_update_properties_of_kind() function to add it""", prop, kind)
+            return False
+    return True
