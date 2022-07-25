@@ -1,6 +1,7 @@
 import datetime
+import logging
 from random import randint
-from typing import Tuple, Generator
+from typing import Tuple, Generator, Optional
 
 from fabulist import Fabulist
 import mimesis.random as rand
@@ -9,6 +10,7 @@ from mimesis.locales import Locale
 from mimesis.schema import Field, Schema
 
 import deeppavlov_kg.core.graph as graph
+import deeppavlov_kg.core.ontology as ontology
 
 generic = Generic(locale=Locale.EN)
 fabulist = Fabulist()
@@ -122,7 +124,7 @@ def generate_rels(iterations: int, nodes: dict) -> list:
 
     """
     relationships = rels.create(iterations)
-    nodes_ids = [key for key in nodes]
+    nodes_ids = [k for k in nodes]
     for relationship in relationships:
         relationship.update(
             {
@@ -171,12 +173,17 @@ def iterate_generate_1node_and_1rel(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
+        ontology.create_kind(
+            node_kind,
+            parent=node_parent_kind,
+            kind_properties=set(node["properties"].keys())
+        )
+
         graph.create_entity(
-            kind=node["labels"][0],
+            kind=node_kind,
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],
-            parent_kind=node_parent_kind,
         )
         graph.create_relationship(
             id_a=rel["start"]["Id"],
@@ -194,7 +201,7 @@ def fake_update(
     relationships: list,
     n_updates: int,
     interval_in_days: datetime.timedelta,
-) -> Tuple[dict, list]:
+) -> Optional[Tuple[dict, list]]:
     """Updates the database.
 
     Adds new relationships and entities & updates existing ones by adding properties.
@@ -222,6 +229,18 @@ def fake_update(
                 properties_dict = {}
                 for item in new_properties:
                     properties_dict.update(item)
+                entity = graph.get_entity_by_id(node_id)
+                if not entity:
+                    logging.error(
+                        "Node with Id %s is not in database\nNothing has been updated", node_id
+                    )
+                    return None
+                kinds_frozenset = entity.labels
+                kind = next(iter(kinds_frozenset))
+                ontology.create_properties_of_kind(
+                    kind,
+                    new_properties=list(properties_dict.keys())
+                )
                 graph.create_or_update_properties_of_entity(
                     id_=node_id,
                     list_of_property_kinds=list(properties_dict.keys()),
@@ -275,8 +294,19 @@ def generate_specific_amount_of_data(
         node["properties"].update(
             {"Id": node["Id"], "_creation_timestamp": _date}
         )
+
+        node_kind = node["labels"][0]
+        node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
+        while node_parent_kind == node_kind:
+            node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
+
+        ontology.create_kind(
+            node_kind,
+            parent=node_parent_kind,
+            kind_properties=set(node["properties"].keys())
+        )
         graph.create_entity(
-            kind=node["labels"][0],
+            kind=node_kind,
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],

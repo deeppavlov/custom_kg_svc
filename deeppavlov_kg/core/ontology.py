@@ -126,6 +126,24 @@ def update_properties_of_kind(kind: str, old_properties: list, new_properties: l
     logging.info("Properties has been updated successfully")
 
 
+def create_properties_of_kind(kind: str, new_properties: list):
+    """Creates a list of properties of a given kind
+
+    Returns:
+      kind node in case of success, None otherwise
+    """
+    tree = loader.load_ontology_graph()
+    kind_node = get_kind_node(tree, kind)
+    if kind_node is None:
+        return None
+
+    for prop in new_properties:
+        kind_node.data.properties.add(prop)
+
+    loader.save_ontology_graph(tree)
+    logging.info("Properties has been updated successfully")
+
+
 def get_descendant_kinds(kind: str) -> list:
     """Returns the children kinds of a given kind."""
     tree = loader.load_ontology_graph()
