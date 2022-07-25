@@ -1,4 +1,5 @@
 from datetime import datetime
+from deeppavlov_kg.core import ontology
 
 import deeppavlov_kg.core.graph as graph
 
@@ -95,6 +96,10 @@ def test_populate(drop=True):
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
+            ontology.create_kind(
+                kind,
+                kind_properties=set(entity_dict["mutable"].keys()),
+            )
             graph.create_entity(
                 kind, entity_dict["immutable"]["Id"], entity_dict["mutable"]
             )
@@ -134,17 +139,19 @@ def test_search():
             print(
                 graph.get_current_state(habit[0].get("Id")).get("name"),
                 habit[1].type,
-                dict(habit[1].items()),
-                graph.get_current_state(habit[2].get("Id")).get("name"),
+                dict(habit[3].items()),
+                graph.get_current_state(habit[4].get("Id")).get("name"),
             )
 
 
 def test_update():
+    ontology.create_properties_of_kind("User", ["height"])
     graph.create_or_update_properties_of_entity(
         id_="1",
         list_of_property_kinds=["height", "name"],
         list_of_property_values= [175, "Jay Ryan"],
     )
+    ontology.create_properties_of_kind("User", ["country"])
     graph.create_or_update_properties_of_entities(
         list_of_ids=["1","2"],
         list_of_property_kinds=["country"],
