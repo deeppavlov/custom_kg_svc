@@ -192,7 +192,7 @@ def return_nodes_or_relationships_query(var_names: list):
       query string
 
     """
-    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    var_names = [sanitize_alphanumeric(v) for v in var_names]
     query = f"RETURN {', '.join(var_names)}"
 
     return query
@@ -405,7 +405,7 @@ def with_query(var_names: list) -> str:
 
     """
     query = "WITH "
-    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    var_names = [sanitize_alphanumeric(v) for v in var_names]
     var_names_str = ", ".join(var_names)
 
     query = query + var_names_str
@@ -449,7 +449,7 @@ def where_property_value_in_list_query(var_name:str, property_kind:"str", values
     """
     var_name = sanitize_alphanumeric(var_name)
     property_kind = sanitize_alphanumeric(property_kind)
-    values = [sanitize_id(value) for value in values]
+    values = [sanitize_id(v) for v in values]
     query = f"WHERE {var_name}.{property_kind} IN {values}"
     return query
 
@@ -468,8 +468,8 @@ def where_entity_kind_in_list_query(var_name:str, kinds:list) -> str:
 
     """
     var_name = sanitize_alphanumeric(var_name)
-    kinds = [sanitize_id(kind) for kind in kinds]
-    constraints = [f"'{kind}' in labels({var_name})" for kind in kinds]
+    kinds = [sanitize_id(k) for k in kinds]
+    constraints = [f"'{k}' in labels({var_name})" for k in kinds]
     query = " OR ".join(constraints)
     query = " ".join(["WHERE", query])
     return query

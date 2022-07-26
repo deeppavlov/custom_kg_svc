@@ -6,7 +6,7 @@ from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 from deeppavlov_kg.utils import loader
 
 
-class Entity(object):
+class Kind(object):
     """A class to represent an entity. It's used as argument for treelib node data"""
     def __init__(self, properties: set):
         """
@@ -46,7 +46,7 @@ def create_kind(
             start_tree.create_node(
                 tag="Kind",
                 identifier="Kind",
-                data=Entity(set()),
+                data=Kind(set()),
             )
     tree = start_tree
 
@@ -63,7 +63,7 @@ def create_kind(
             tag=kind,
             identifier=kind,
             parent=parent,
-            data=Entity(kind_properties),
+            data=Kind(kind_properties),
         )
         loader.save_ontology_graph(tree)
     except DuplicatedNodeIdError:
@@ -74,7 +74,7 @@ def create_kind(
     return tree
 
 
-def get_kind_node(tree: Tree, kind: str):
+def get_kind_node(tree: Optional[Tree], kind: str):
     """Searches tree for kind and returns the kind node
 
     Returns:
@@ -144,13 +144,13 @@ def create_properties_of_kind(kind: str, new_properties: list):
     logging.info("Properties has been updated successfully")
 
 
-def get_descendant_kinds(kind: str) -> list:
+def get_descendant_kinds(kind: str) -> Optional[list]:
     """Returns the children kinds of a given kind."""
     tree = loader.load_ontology_graph()
     descendants = []
     if tree:
         try:
-            descendants = [descendant.tag for descendant in tree.children(kind)]
+            descendants = [ch.tag for ch in tree.children(kind)]
         except NodeIDAbsentError:
             logging.error("Kind '%s' is not in ontology graph", kind)
             return None
@@ -163,11 +163,11 @@ def get_kind_properties(kind: str) -> Optional[set]:
     kind_node = get_kind_node(tree, kind)
     if kind_node is not None:
         return kind_node.data.properties
-    return None
+    return set()
 
 
 def are_properties_in_kind(list_of_property_kinds, kind):
-    """Checks if all the properties in the list are in fact properties of 'kind' in 
+    """Checks if all the properties in the list are in fact properties of 'kind' in
     the ontology graph.
     """
     kind_properties = get_kind_properties(kind)

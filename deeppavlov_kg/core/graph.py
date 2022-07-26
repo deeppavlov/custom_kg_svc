@@ -1,13 +1,18 @@
 import os
-from typing import Optional, List
+from typing import Optional, List, Tuple, Union
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
-import neo4j
+from neo4j import graph as neo4j_graph
 from deeppavlov_kg.utils.settings import OntologySettings
 import deeppavlov_kg.core.querymaker as querymaker
 import deeppavlov_kg.core.ontology as ontology
 import deeppavlov_kg.utils.loader as loader
+
+
+ontology_settings = OntologySettings()
+
+config.DATABASE_URL = ontology_settings.neo4j_bolt_url
 
 
 def drop_database():
@@ -65,7 +70,7 @@ def create_entity(
         return None
 
 
-def get_entity_by_id(id_: str) -> Optional[neo4j.graph.Node]: # type: ignore
+def get_entity_by_id(id_: str) -> Optional[neo4j_graph.Node]:
     """Looks up for and return entity with given id.
 
     Args:
@@ -85,7 +90,7 @@ def get_entity_by_id(id_: str) -> Optional[neo4j.graph.Node]: # type: ignore
 
 
 # Needed for batch operations.
-def get_entities_by_id(list_of_ids: list) -> Optional[List[neo4j.graph.Node]]: # type: ignore
+def get_entities_by_id(list_of_ids: list) -> Optional[List[neo4j_graph.Node]]:
     """Looks up for and return entities with given ids.
 
     Args:
@@ -128,6 +133,8 @@ def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None
         properties_filter = {}
 
     descendant_kinds = ontology.get_descendant_kinds(kind)
+    if descendant_kinds is None:
+        return []
     descendant_kinds.append(kind)
 
     match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
@@ -179,7 +186,7 @@ def create_or_update_properties_of_entities(
     Args:
       list_of_ids: entities ids
       list_of_property_kinds: properties kinds to be updated or added
-      list_of_property_values: properties values that correspont respectively to property_kinds
+      list_of_property_values: properties values that correspond respectively to property_kinds
       change_date: the date of entities updating
 
     Returns:
@@ -196,8 +203,13 @@ def create_or_update_properties_of_entities(
         change_date = datetime.datetime.now()
     updates = dict(zip(list_of_property_kinds, list_of_property_values))
 
-    for id in list_of_ids:
-        kinds_frozenset = get_entity_by_id(id).labels
+    for id_ in list_of_ids:
+        entity = get_entity_by_id(id_)
+        if not entity:
+            logging.error("Node with Id %s is not in database\nNothing has been updated", id_)
+            return None
+        else:
+            kinds_frozenset = entity.labels
         kind = next(iter(kinds_frozenset))
         if not ontology.are_properties_in_kind(list_of_property_kinds, kind):
             return None
@@ -265,8 +277,7 @@ def remove_property_from_entity(
       State node in case of success or None in case of error.
     """
 
-    property_kinds_list = []
-    property_kinds_list.append(property_kind) 
+    property_kinds_list = [property_kind]
 
     return delete_properties_from_entity(id_, property_kinds_list, change_date)
 
@@ -275,7 +286,7 @@ def delete_properties_from_entity(
         id_: str,
         property_kinds: list,
         change_date: Optional[datetime.datetime] = None,
-    ):
+    ) -> Optional[neo4j_graph.Node]:
     """Deletes a property from a given entity.
 
     Args:
@@ -289,12 +300,14 @@ def delete_properties_from_entity(
     current_state = get_current_state(id_)
     if not current_state:
         logging.warning("No property was removed. No entity with specified id was found")
-        return
+        return None
 
     property_values = [""]*len(property_kinds)
     create_or_update_properties_of_entity(id_, property_kinds, property_values, change_date)
 
     new_current_state = get_current_state(id_)
+    if new_current_state is None:
+        return None
 
     match_state, id_updated = querymaker.match_node_query("state", "State")
     where_state = querymaker.where_node_internal_id_equal_to("state", new_current_state.id)
@@ -390,9 +403,9 @@ def search_relationships(
     kind_a: str = "",
     kind_b: str = "",
     limit=10,
-    programmer=0,
+    return_query_instead_of_relationships: bool =False,
     search_all_states=False,
-) -> list:
+) -> Union[list, Tuple[str, dict]]:
     """Searches existing relationships.
 
     Args:
@@ -401,7 +414,7 @@ def search_relationships(
       id_a: id of entity A
       id_b: id of entity B
       limit: maximum number of relationships to be returned
-      programmer: False for returning the relationship found. True for returning
+      return_query_instead_of_relationships: False for returning the found relationship. True for returning
                   (query, params) of that relationship matching.
 
     Returns:
@@ -432,7 +445,7 @@ def search_relationships(
     query = "\n".join([match_a, match_b, rel_query, return_, limit_])
     params = {**filter_a, **filter_b, **rel_properties_filter}
 
-    if programmer:
+    if return_query_instead_of_relationships:
         query = "\n".join([match_a, match_b, rel_query])
         return query, params
 
@@ -511,7 +524,7 @@ def delete_relationship(
             relationship_kind,
             id_a=id_a,
             id_b=id_b,
-            programmer=1,
+            return_query_instead_of_relationships=True,
         )
         delete_query = querymaker.delete_query("r", is_node=False)
         query = "\n".join([match_relationship, delete_query])
@@ -534,7 +547,7 @@ def delete_relationship(
         return result
 
 
-def get_current_state(id_:str) -> Optional[neo4j.graph.Node]: # type: ignore
+def get_current_state(id_:str) -> Optional[neo4j_graph.Node]:
     """Retrieves the current State node: by a given Entity node.
 
     Args:
@@ -609,7 +622,3 @@ def get_entity_state_by_date(id_: str, date_: str):
     else:
         logging.error("No state nod")
         return None
-
-ontology_settings = OntologySettings()
-
-config.DATABASE_URL = ontology_settings.neo4j_bolt_url
