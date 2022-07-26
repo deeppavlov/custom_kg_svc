@@ -279,19 +279,19 @@ def remove_property_from_entity(
 
     property_kinds_list = [property_kind]
 
-    return delete_properties_from_entity(id_, property_kinds_list, change_date)
+    return remove_properties_from_entity(id_, property_kinds_list, change_date)
 
 
-def delete_properties_from_entity(
+def remove_properties_from_entity(
         id_: str,
         property_kinds: list,
         change_date: Optional[datetime.datetime] = None,
     ) -> Optional[neo4j_graph.Node]:
-    """Deletes a property from a given entity.
+    """Removes a property from a given entity.
 
     Args:
        id_: entity id
-       property_kinds: property keys to be deleted
+       property_kinds: property keys to be removed
        change_date: the date of node updating
 
     Returns:
@@ -320,23 +320,15 @@ def delete_properties_from_entity(
     return node
 
 
-def delete_entity(
+def destroy_entity(
     id_: str,
-    completely=False,
     deletion_date: Optional[datetime.datetime] = None,
 ):
-    """Deletes an entity completely from database or make it a thing of the past.
-
-    Args:
-      id_: entity id
-      completely: if True, then the entity will be deleted completely from DB
-                  with all its relationships. If False, the entity will be marked
-                  as deleted by the _deleted property.
-      deletion_date: the date of entity deletion
+    """Deletes an entity completely from DB with all its relationships.
 
     Returns:
       In case of error: None.
-      In case of success: if completely: returns True, of State node otherwise
+      In case of success: State node
 
     """
     if deletion_date is None:
@@ -345,19 +337,42 @@ def delete_entity(
     if not search_for_entities(properties_filter=properties_filter):
         logging.error("No such a node to be deleted")
         return None
-    if completely:
-        match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
-        delete_a = querymaker.delete_query("a")
 
-        query = "\n".join([match_a, delete_a])
-        params = filter_a
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
+    delete_a = querymaker.delete_node_query("a")
 
-        db.cypher_query(query, params)
-        return True
-    else:
-        return create_or_update_property_of_entity(
-            properties_filter["Id"], "_deleted", True, deletion_date
-        )
+    query = "\n".join([match_a, delete_a])
+    params = filter_a
+
+    db.cypher_query(query, params)
+    return True
+
+
+def remove_entity(
+    id_: str,
+    deletion_date: Optional[datetime.datetime] = None,
+):
+    """Makes an entity a thing of the past by marking it as deleted using the _deleted property.
+
+    Args:
+      id_: entity id
+      deletion_date: the date of entity deletion
+
+    Returns:
+      In case of error: None.
+      In case of success: State node
+
+    """
+    if deletion_date is None:
+        deletion_date = datetime.datetime.now()
+    properties_filter = {"Id": id_}
+    if not search_for_entities(properties_filter=properties_filter):
+        logging.error("No such a node to be deleted")
+        return None
+    
+    return create_or_update_property_of_entity(
+        properties_filter["Id"], "_deleted", True, deletion_date
+    )
 
 
 def create_relationship(
@@ -480,7 +495,7 @@ def update_relationship(
     if change_date is None:
         change_date = datetime.datetime.now()
 
-    delete_relationship(
+    remove_relationship(
         relationship_kind, id_a, id_b, deletion_date=change_date
     )
     create_relationship(
@@ -492,22 +507,18 @@ def update_relationship(
     )
 
 
-def delete_relationship(
+def destroy_relationship(
     relationship_kind: str,
     id_a: str,
     id_b: str,
-    completely: bool = False,
     deletion_date: Optional[datetime.datetime] = None,
 ) -> Optional[bool]:
-    """Deletes a relationship between two entities A and B.
+    """Deletes a relationship between two entities A and B completely from DB.
 
     Args:
       relationship_kind: relationship type
       id_a: id of entity A
       id_b: id of entity B
-      completely: if True, then the relationship will be deleted completely
-                  from DB. If False, a new state node will be created via the versioner
-                  to indicate a new state without the deleted relationship.
       deletion_date: the date of relationship deletion
 
     Returns:
@@ -519,32 +530,58 @@ def delete_relationship(
         logging.error("No such a relationship to be deleted")
         return None
 
-    if completely:
-        match_relationship, params = search_relationships(
-            relationship_kind,
-            id_a=id_a,
-            id_b=id_b,
-            return_query_instead_of_relationships=True,
-        )
-        delete_query = querymaker.delete_query("r", is_node=False)
-        query = "\n".join([match_relationship, delete_query])
+    match_relationship, params = search_relationships(
+        relationship_kind,
+        id_a=id_a,
+        id_b=id_b,
+        return_query_instead_of_relationships=True,
+    )
+    delete_query = querymaker.delete_relationship_cypher_query("r")
+    query = "\n".join([match_relationship, delete_query])
 
-        db.cypher_query(query, params)
-    else:
-        match_a, match_b = [""] * 2
-        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
-        match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
+    db.cypher_query(query, params)
 
-        delete_query = querymaker.delete_relationship_query(
-            "a", relationship_kind, "b", deletion_date
-        )
-        return_ = querymaker.return_nodes_or_relationships_query(["result"])
 
-        query = "\n".join([match_a, match_b, delete_query, return_])
-        params = {**filter_a, **filter_b}
+def remove_relationship(
+    relationship_kind: str,
+    id_a: str,
+    id_b: str,
+    deletion_date: Optional[datetime.datetime] = None,
+) -> Optional[bool]:
+    """Removes a relationship between two entities A and B using the versioner.
+    
+    A new state node will be created via the versioner to indicate a new state
+    without the deleted relationship.
 
-        result, _ = db.cypher_query(query, params)
-        return result
+    Args:
+      relationship_kind: relationship type
+      id_a: id of entity A
+      id_b: id of entity B
+      deletion_date: the date of relationship deletion
+
+    Returns:
+      True if the relationship
+    """
+    if deletion_date is None:
+        deletion_date = datetime.datetime.now()
+    if not search_relationships(relationship_kind, id_a=id_a, id_b=id_b):
+        logging.error("No such a relationship to be deleted")
+        return None
+
+    match_a, match_b = [""] * 2
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
+    match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
+
+    delete_query = querymaker.delete_relationship_versioner_query(
+        "a", relationship_kind, "b", deletion_date
+    )
+    return_ = querymaker.return_nodes_or_relationships_query(["result"])
+
+    query = "\n".join([match_a, match_b, delete_query, return_])
+    params = {**filter_a, **filter_b}
+
+    result, _ = db.cypher_query(query, params)
+    return result
 
 
 def get_current_state(id_:str) -> Optional[neo4j_graph.Node]:

@@ -340,7 +340,7 @@ def match_relationship_versioner_query(
     return query, rel_properties_filter
 
 
-def delete_relationship_query(
+def delete_relationship_versioner_query(
     var_name_a: str, relationship_kind: str, var_name_b: str, change_date: datetime.datetime
 ) -> str:
     """Prepares and sanitizes versioner's delete CYPHER query for relationship deletion.
@@ -372,14 +372,13 @@ def delete_relationship_query(
     return query
 
 
-def delete_query(var_name, is_node=True):
-    """Prepares DELETE CYPHER query for nodes and relationships.
+def delete_relationship_cypher_query(var_name):
+    """Prepares DELETE CYPHER query for relationships.
     
     Should be used together with match_query.
 
     Args:
       var_name: variable name which CYPHER will use to identify the match
-      is_node: True for deleting nodes, False for relationships
 
     Returns:
       query string
@@ -387,8 +386,23 @@ def delete_query(var_name, is_node=True):
     """
     var_name = sanitize_alphanumeric(var_name)
     query = f"DELETE {var_name}"
-    if is_node:
-        query = "DETACH " + query
+    return query
+
+
+def delete_node_query(var_name):
+    """Prepares DELETE CYPHER query for nodes, deleting a node and all its related relationships.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    query = f"DETACH DELETE {var_name}"
     return query
 
 

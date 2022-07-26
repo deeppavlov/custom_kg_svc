@@ -46,7 +46,7 @@ def create_kind(
             start_tree.create_node(
                 tag="Kind",
                 identifier="Kind",
-                data=Kind(set()),
+                data=Kind(set(["_deleted"])),
             )
     tree = start_tree
 
