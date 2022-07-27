@@ -113,16 +113,19 @@ def get_entities_by_id(list_of_ids: list) -> Optional[List[neo4j_graph.Node]]:
         return None
 
 
-# it would be useful to add support for hierarchical ontological search, e.g.: user can specify "Kind" as 
-# "DP_Kinds_Kind" (which is a super generic thing), and then we should return all nodes whose "Kind" is 
-# either set as "DP_Kinds_Kind" or is its child (direct or indirect), and that should be a parameter
-# e.g., "filter_by_children_kinds". By default it could be set to False.
-def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None, limit=10) -> list:
+def search_for_entities(
+    kind: str = "",
+    properties_filter: Optional[dict] = None,
+    filter_by_children_kinds: bool = False,
+    limit=10
+) -> list:
     """Searches existing entities.
 
     Args:
       kind: entity kind
       properties_filter: entity keyword properties for matching
+      filter_by_children_kinds: False to search for entities of kind 'kind' only.
+                                True to also search for all children kinds of 'kind'.
       limit: maximum number of returned nodes
 
     Returns:
@@ -132,19 +135,37 @@ def search_for_entities(kind: str = "", properties_filter: Optional[dict] = None
     if properties_filter is None:
         properties_filter = {}
 
-    descendant_kinds = ontology.get_descendant_kinds(kind)
-    if descendant_kinds is None:
-        return []
-    descendant_kinds.append(kind)
+    kinds_to_search_for=[]
+    where_query= ""
+    if kind:
+        if filter_by_children_kinds:
+            descendant_kinds = ontology.get_descendant_kinds(kind)
+            if descendant_kinds is None:
+                return []
+            kinds_to_search_for += descendant_kinds
+        kinds_to_search_for.append(kind)
+        where_query = querymaker.where_entity_kind_in_list_query("a", kinds_to_search_for)
 
-    match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
-    where_ = querymaker.where_entity_kind_in_list_query("a", descendant_kinds)
+    match_a, filter_a = querymaker.match_node_query("a")
     return_a = querymaker.return_nodes_or_relationships_query(["a"])
     limit_a = querymaker.limit_query(limit)
-    query = "\n".join([match_a, where_, return_a, limit_a])
+    query = "\n".join([match_a, where_query, return_a, limit_a])
 
     nodes, _ = db.cypher_query(query, filter_a)
-    return nodes
+
+    if not properties_filter:
+        return nodes
+
+    entities = []
+    for node in nodes:
+        state = get_current_state(node[0].get("Id"))
+        if state is not None:
+            for prop in properties_filter:
+                if state.get(prop) != properties_filter[prop]:
+                    continue
+                entities.append(node)
+
+    return entities
 
 
 def create_or_update_property_of_entity(
