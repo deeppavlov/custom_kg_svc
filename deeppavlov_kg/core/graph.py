@@ -4,6 +4,7 @@ import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
 from neo4j import graph as neo4j_graph
+from neo4j.exceptions import ClientError
 from deeppavlov_kg.utils.settings import OntologySettings
 import deeppavlov_kg.core.querymaker as querymaker
 import deeppavlov_kg.core.ontology as ontology
@@ -19,11 +20,11 @@ def drop_database():
     """Clears database."""
     clear_neo4j_database(db)
 
-    ontology_file = "deeppavlov_kg/database/ontology_graph.pickle"
+    ontology_file = ontology_settings.ontology_file_path
     if os.path.exists(ontology_file):
         os.remove(ontology_file)
 
-    db_ids = "deeppavlov_kg/database/db_ids.txt"
+    db_ids = ontology_settings.db_ids_file_path
     if os.path.exists(db_ids):
         os.remove(db_ids)
 
@@ -57,8 +58,8 @@ def create_entity(
     query, params = querymaker.init_entity_query(
         kind, immutable_properties, state_properties, create_date
     )
-    return_ = querymaker.return_nodes_or_relationships_query(["node"])
-    query = "\n".join([query, return_])
+    return_query = querymaker.return_nodes_or_relationships_query(["node"])
+    query = "\n".join([query, return_query])
 
     nodes, _ = db.cypher_query(query, params)
     loader.store_id(id_)
@@ -241,10 +242,10 @@ def create_or_update_properties_of_entities(
     set_query, updated_updates = querymaker.patch_property_query(
         "a", updates, change_date
     )
-    return_ = querymaker.return_nodes_or_relationships_query(["node"])
+    return_query = querymaker.return_nodes_or_relationships_query(["node"])
 
     params = {**updated_updates}
-    query = "\n".join([match_a, where_a, with_a, set_query, return_])
+    query = "\n".join([match_a, where_a, with_a, set_query, return_query])
 
     nodes, _ = db.cypher_query(query, params)
 
@@ -390,7 +391,7 @@ def remove_entity(
     if not search_for_entities(properties_filter=properties_filter):
         logging.error("No such a node to be deleted")
         return None
-    
+
     return create_or_update_property_of_entity(
         properties_filter["Id"], "_deleted", True, deletion_date
     )
@@ -424,8 +425,8 @@ def create_relationship(
     rel, rel_properties = querymaker.create_relationship_query(
         "a", relationship_kind, rel_properties, "b", create_date
     )
-    with_ = querymaker.with_query(["a", "b"])
-    query = "\n".join([match_a, match_b, with_, rel])
+    with_query = querymaker.with_query(["a", "b"])
+    query = "\n".join([match_a, match_b, with_query, rel])
     params = {**filter_a, **filter_b, **rel_properties}
 
     db.cypher_query(query, params)
@@ -450,8 +451,8 @@ def search_relationships(
       id_a: id of entity A
       id_b: id of entity B
       limit: maximum number of relationships to be returned
-      return_query_instead_of_relationships: False for returning the found relationship. True for returning
-                  (query, params) of that relationship matching.
+      return_query_instead_of_relationships: False for returning the found relationship.
+                  True for returning (query, params) of that relationship matching.
 
     Returns:
       neo4j relationships list
@@ -467,18 +468,22 @@ def search_relationships(
     if id_b:
         b_properties_filter = {"Id": id_b}
     state_relationship_kind = "HAS_STATE" if search_all_states else "CURRENT"
-    match_a, filter_a = querymaker.match_node_query("a", kind=kind_a, properties_filter=a_properties_filter)
-    match_b, filter_b = querymaker.match_node_query("b", kind=kind_b, properties_filter=b_properties_filter)
+    match_a, filter_a = querymaker.match_node_query(
+        "a", kind=kind_a, properties_filter=a_properties_filter
+    )
+    match_b, filter_b = querymaker.match_node_query(
+        "b", kind=kind_b, properties_filter=b_properties_filter
+    )
     rel_query, rel_properties_filter = querymaker.match_relationship_versioner_query(
         "a", "r", relationship_kind, rel_properties_filter, "b", state_relationship_kind
     )
 
-    return_ = querymaker.return_nodes_or_relationships_query(
+    return_query = querymaker.return_nodes_or_relationships_query(
         ["a", state_relationship_kind.lower(), "state", "r", "b"]
     )
-    limit_ = querymaker.limit_query(limit)
+    limit_query = querymaker.limit_query(limit)
 
-    query = "\n".join([match_a, match_b, rel_query, return_, limit_])
+    query = "\n".join([match_a, match_b, rel_query, return_query, limit_query])
     params = {**filter_a, **filter_b, **rel_properties_filter}
 
     if return_query_instead_of_relationships:
@@ -570,7 +575,7 @@ def remove_relationship(
     deletion_date: Optional[datetime.datetime] = None,
 ) -> Optional[bool]:
     """Removes a relationship between two entities A and B using the versioner.
-    
+
     A new state node will be created via the versioner to indicate a new state
     without the deleted relationship.
 
@@ -596,9 +601,9 @@ def remove_relationship(
     delete_query = querymaker.delete_relationship_versioner_query(
         "a", relationship_kind, "b", deletion_date
     )
-    return_ = querymaker.return_nodes_or_relationships_query(["result"])
+    return_query = querymaker.return_nodes_or_relationships_query(["result"])
 
-    query = "\n".join([match_a, match_b, delete_query, return_])
+    query = "\n".join([match_a, match_b, delete_query, return_query])
     params = {**filter_a, **filter_b}
 
     result, _ = db.cypher_query(query, params)
@@ -620,21 +625,26 @@ def get_current_state(id_:str) -> Optional[neo4j_graph.Node]:
     return_query = querymaker.return_nodes_or_relationships_query(["node"])
 
     query = "\n".join([match_query, get_query, return_query])
-    node, _ = db.cypher_query(query, params)
-    if node:
+    try:
+        node, _ = db.cypher_query(query, params)
         [[node]] = node
         return node
-    else:
-        logging.error("No current state was found for the given node")
+    except ClientError as exc:
+        logging.error(
+            """The given entity has no current state node. Either the entity is no longer active,
+            or it's not a versioner node. Try calling get_entity_state_by_date
+            The next error has occured %s""", exc
+        )
         return None
 
 
-def get_entities_state_by_date(list_of_ids: list, date_: str):
+def get_entities_states_by_date(list_of_ids: list, date_to_inspect: str):
     """Returns the active state nodes on a given date for many entities.
 
     Args:
       list_of_ids: Entity ids
-      date_: Date, on which the state is required. Should be of format: "%Y-%m-%dT%H:%M:%S"
+      date_to_inspect: Date, on which the state is required.
+                       Should be of format: "%Y-%m-%dT%H:%M:%S"
 
     returns:
       State nodes in case of success or None in case of error.
@@ -648,11 +658,11 @@ def get_entities_state_by_date(list_of_ids: list, date_: str):
         rel_properties_filter={},
         var_name_b="state",
     )
-    where_on_date = querymaker.where_state_on_date(date_)
+    where_on_date = querymaker.where_state_on_date(date_to_inspect)
 
-    return_ = querymaker.return_nodes_or_relationships_query(["state"])
+    return_query = querymaker.return_nodes_or_relationships_query(["state"])
 
-    query = "\n".join([match_a, where_id, match_r, where_on_date, return_])
+    query = "\n".join([match_a, where_id, match_r, where_on_date, return_query])
     params = {**node_properties_filter, **rel_properties_filter}
 
     state_nodes, _ = db.cypher_query(query, params)
@@ -663,20 +673,21 @@ def get_entities_state_by_date(list_of_ids: list, date_: str):
         return None
 
 
-def get_entity_state_by_date(id_: str, date_: str):
+def get_entity_state_by_date(id_: str, date_to_inspect: str):
     """Returns the active state node on a given date.
 
     Args:
       id_: Entity id
-      date_: Date, on which the state is required. Should be of format: "%Y-%m-%dT%H:%M:%S"
+      date_to_inspect: Date, on which the state is required.
+                       Should be of format: "%Y-%m-%dT%H:%M:%S"
 
     returns:
       State node in case of success or None in case of error.
     """
-    state_nodes = get_entities_state_by_date([id_], date_)
+    state_nodes = get_entities_states_by_date([id_], date_to_inspect)
     if state_nodes:
         [[state]] = state_nodes
         return state
     else:
-        logging.error("No state nod")
+        logging.error("No state node")
         return None

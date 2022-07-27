@@ -118,7 +118,7 @@ def match_node_query(
         param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in properties_filter)
         properties_filter = {f"{k}_{var_name}": v for k, v in properties_filter.items()}
         specify_param_placeholders = f"{{{param_placeholders}}})"
-    
+
     query = "".join([query, specify_kind, specify_param_placeholders])
     return query, properties_filter
 
@@ -214,7 +214,7 @@ def create_relationship_query(
     create_date: datetime.datetime,
 ) -> Tuple[str, dict]:
     """Prepares and sanitizes versioner's create CYPHER query for relationship creation.
-    
+
     The versioner's create query is graph.versioner.relationship.create.
     Should be used together with match_query.
 
@@ -344,7 +344,7 @@ def delete_relationship_versioner_query(
     var_name_a: str, relationship_kind: str, var_name_b: str, change_date: datetime.datetime
 ) -> str:
     """Prepares and sanitizes versioner's delete CYPHER query for relationship deletion.
-    
+
     The versioner's delete query is graph.versioner.relationship.delete.
     Should be used together with match_query.
 
@@ -374,7 +374,7 @@ def delete_relationship_versioner_query(
 
 def delete_relationship_cypher_query(var_name):
     """Prepares DELETE CYPHER query for relationships.
-    
+
     Should be used together with match_query.
 
     Args:
@@ -408,7 +408,7 @@ def delete_node_query(var_name):
 
 def with_query(var_names: list) -> str:
     """Prepares WITH CYPHER query to chain queries togther
-    
+
     Should be used together with match_query.
 
     Args:
@@ -524,4 +524,3 @@ def get_current_state_query(var_name: str) -> str:
     query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node"
 
     return query
-
