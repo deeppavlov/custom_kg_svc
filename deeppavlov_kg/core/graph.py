@@ -355,12 +355,11 @@ def destroy_entity(
     """
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
-    properties_filter = {"Id": id_}
-    if not search_for_entities(properties_filter=properties_filter):
+    if not get_entity_by_id(id_):
         logging.error("No such a node to be deleted")
         return None
 
-    match_a, filter_a = querymaker.match_node_query("a", properties_filter=properties_filter)
+    match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_})
     delete_a = querymaker.delete_node_query("a")
 
     query = "\n".join([match_a, delete_a])
@@ -387,13 +386,12 @@ def remove_entity(
     """
     if deletion_date is None:
         deletion_date = datetime.datetime.now()
-    properties_filter = {"Id": id_}
-    if not search_for_entities(properties_filter=properties_filter):
+    if not get_entity_by_id(id_):
         logging.error("No such a node to be deleted")
         return None
 
     return create_or_update_property_of_entity(
-        properties_filter["Id"], "_deleted", True, deletion_date
+        id_, "_deleted", True, deletion_date
     )
 
 
