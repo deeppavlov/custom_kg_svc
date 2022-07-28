@@ -1,15 +1,17 @@
 from datetime import datetime
 from deeppavlov_kg.core import ontology
-
 import deeppavlov_kg.core.graph as graph
 
+FROM_NODE_ORDER_IN_RELATIONSHIP_RESULT = 0
+HAS_STATE_RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT = 1
+STATE_NODE_ORDER_IN_RELATIONSHIP_RESULT = 2
+RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT = 3
+TO_NODE_ORDER_IN_RELATIONSHIP_RESULT = 4
 
 TEST_USER_ENTITIES = [
     {
-        "immutable": {
-            "Id": "1",
-        },
-        "mutable": {
+        "Id": "1",
+        "properties": {
             "name": "Jack Ryan",
             "born": datetime.strptime("1980-06-30", "%Y-%m-%d"),
             "OCEAN_openness": True,
@@ -20,10 +22,8 @@ TEST_USER_ENTITIES = [
         },
     },
     {
-        "immutable": {
-            "Id":"2",
-        },
-        "mutable": {
+        "Id":"2",
+        "properties": {
             "name": "Sandy Bates",
             "born": "1998-04-10",
             "OCEAN_openness": True,
@@ -36,30 +36,35 @@ TEST_USER_ENTITIES = [
 ]
 
 TEST_BOT_ENTITIES = [
-    {"immutable": {"Id": "3"}, "mutable": {"name": "ChatBot", "born": "2020-03-02"}}
+    {"Id": "3", "properties": {"name": "ChatBot", "born": "2020-03-02"}}
+]
+
+TEST_UNIVERSITY_ENTITIES = [
+    {"Id": "3.5", "properties": {"name": "Oxford"}}
 ]
 
 TEST_INTEREST_ENTITIES = [
-    {"immutable": {"Id": "4"}, "mutable": {"name": "Theater"}},
-    {"immutable": {"Id": "5"}, "mutable": {"name": "Artificial Intelligence"}},
-    {"immutable": {"Id": "6"}, "mutable": {"name": "Sport"}},
-    {"immutable": {"Id": "7"}, "mutable": {"name": "Mindfulness"}},
-    {"immutable": {"Id": "8"}, "mutable": {"name": "Medicine"}},
+    {"Id": "4", "properties": {"name": "Theater"}},
+    {"Id": "5", "properties": {"name": "Artificial Intelligence"}},
+    {"Id": "6", "properties": {"name": "Sport"}},
+    {"Id": "7", "properties": {"name": "Mindfulness"}},
+    {"Id": "8", "properties": {"name": "Medicine"}},
 ]
 
 TEST_HABIT_ENTITIES = [
-    {"immutable": {"Id": "9"}, "mutable": {"name": "Reading", "label": "Good"}},
-    {"immutable": {"Id": "10"}, "mutable": {"name": "Yoga", "label": "Good"}},
-    {"immutable": {"Id": "11"}, "mutable": {"name": "Alcohol", "label": "Bad"}},
-    {"immutable": {"Id": "12"}, "mutable": {"name": "Smoking", "label": "Bad"}},
-    {"immutable": {"Id": "13"}, "mutable": {"name": "Dancing"}},
+    {"Id": "9", "properties": {"name": "Reading", "label": "Good"}},
+    {"Id": "10", "properties": {"name": "Yoga", "label": "Good"}},
+    {"Id": "11", "properties": {"name": "Alcohol", "label": "Bad"}},
+    {"Id": "12", "properties": {"name": "Smoking", "label": "Bad"}},
+    {"Id": "13", "properties": {"name": "Dancing"}},
 ]
 
-TEST_DISEASE_ENTITIES = [{"immutable": {"Id": "14"}, "mutable": {"name": "Cancer"}}]
+TEST_DISEASE_ENTITIES = [{"Id": "14", "properties": {"name": "Cancer"}}]
 
 TEST_ENTITIES = {
     "User": TEST_USER_ENTITIES,
     "Bot": TEST_BOT_ENTITIES,
+    "University": TEST_UNIVERSITY_ENTITIES,
     "Interest": TEST_INTEREST_ENTITIES,
     "Habit": TEST_HABIT_ENTITIES,
     "Disease": TEST_DISEASE_ENTITIES,
@@ -82,6 +87,7 @@ TEST_MATCHES = [
     ("2", "KEEPS_UP", {}, "9"),
     ("2", "KEEPS_UP", {}, "13"),
     ("1", "KEEPS_UP", {}, "13"),
+    ("1", "STUDY", {}, "3.5"),
     ("1", "LIKES", {}, "7"),
     ("1", "DISLIKES", {}, "4"),
     ("12", "CAUSES", {}, "14"),
@@ -98,10 +104,10 @@ def test_populate(drop=True):
         for entity_dict in entities:
             ontology.create_kind(
                 kind,
-                kind_properties=set(entity_dict["mutable"].keys()),
+                kind_properties=set(entity_dict["properties"].keys()),
             )
             graph.create_entity(
-                kind, entity_dict["immutable"]["Id"], entity_dict["mutable"]
+                kind, entity_dict["Id"], entity_dict["properties"]
             )
 
     for id_a, rel, rel_dict, id_b in TEST_MATCHES:
@@ -109,7 +115,7 @@ def test_populate(drop=True):
 
 
 def test_search():
-    print("Search nodes")
+    print("Search nodes:")
     habits = graph.search_for_entities("Habit")
     bad_habits = graph.search_for_entities("Habit", {"label": "Bad"})
     for key, value in {"habits": habits, "bad_habits": bad_habits}.items():
@@ -117,78 +123,135 @@ def test_search():
         for habit in value:
             print(graph.get_current_state(habit[0].get("Id")).get("name"))
 
-    print("Search relationships")
-    habits = graph.search_relationships("KEEPS_UP")
+    print("Search relationships:")
+    habits = graph.search_relationships("KEEPS_UP", search_all_states=True) # relationships of all time
     habits_since_march = graph.search_relationships("KEEPS_UP", {"since": "March"})
+
+    # get sandy's habits
+    sandy_id = [
+        sandy[0].get("Id") for sandy in graph.search_for_entities("User", {"name":"Sandy Bates"})
+    ][0]
     sandy_habits = graph.search_relationships(
-        "KEEPS_UP", id_a="2"
+        "KEEPS_UP", id_a=sandy_id
     )
-    sandy_bad_habits = graph.search_relationships(
-        "KEEPS_UP",
-        id_a="2",
-        id_b="11",
-    )
+
+    # get sandy's bad habits
+    sandy_bad_habits = []
+    bad_habits_ids = [
+        habit[0].get("Id") for habit in bad_habits
+    ]
+    for habit in sandy_habits:
+        if habit[TO_NODE_ORDER_IN_RELATIONSHIP_RESULT].get("Id") in bad_habits_ids:
+            sandy_bad_habits.append(habit)
+
+    # pretty print script
     for key, value in {
-        "habits": habits,
-        "habits_since_march": habits_since_march,
-        "sandy_habits": sandy_habits,
-        "sandy_bad_habits": sandy_bad_habits,
+        "What relationships of kind KEEPS_UP are there?": habits,
+        "What relationships of kind KEEPS_UP are there with property since:March?": habits_since_march,
+        "What habits does sandy have?": sandy_habits,
+        "What bad habits does sandy have?": sandy_bad_habits,
     }.items():
         print("\n", key)
+        printed_relationships = []
         for habit in value:
-            print(
-                graph.get_current_state(habit[0].get("Id")).get("name"),
-                habit[1].type,
-                dict(habit[3].items()),
-                graph.get_current_state(habit[4].get("Id")).get("name"),
-            )
+            user_id = habit[FROM_NODE_ORDER_IN_RELATIONSHIP_RESULT].get("Id")
+            relationship_kind = habit[RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT].type
+            habit_id = habit[TO_NODE_ORDER_IN_RELATIONSHIP_RESULT].get("Id")
+            if (user_id, relationship_kind, habit_id) not in printed_relationships:
+                print(
+                    graph.get_current_state(user_id).get("name"),
+                    relationship_kind,
+                    dict(habit[RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT].items()),
+                    graph.get_current_state(habit_id).get("name"),
+                )
+            printed_relationships.append((user_id, relationship_kind, habit_id))
+
+    # complex query
+    print("\nWhat were Jack's habits when he was at university?")
+    study_rels = graph.search_relationships("STUDY", id_a="1", id_b="3.5", search_all_states=True)
+    state_ids_when_he_was_at_university = set()
+    for rel in study_rels:
+        state_id = rel[STATE_NODE_ORDER_IN_RELATIONSHIP_RESULT].id
+        state_ids_when_he_was_at_university.add(state_id)
+    habits=[]
+    keeps_up_rels = graph.search_relationships(
+        "KEEPS_UP", id_a="1", kind_b="Habit", search_all_states=True
+    )
+    for rel in keeps_up_rels:
+        state_id = rel[STATE_NODE_ORDER_IN_RELATIONSHIP_RESULT].id
+        if state_id in state_ids_when_he_was_at_university:
+            habit = rel[TO_NODE_ORDER_IN_RELATIONSHIP_RESULT]
+            if habit.id not in [item.id for item in habits]:
+                habits.append(habit)
+    for habit in habits:
+        print(graph.get_current_state(habit.get("Id")).get("name"))
 
 
 def test_update():
+    # Update Jack's properties
     ontology.create_properties_of_kind("User", ["height"])
-    graph.create_or_update_properties_of_entity(
-        id_="1",
-        list_of_property_kinds=["height", "name"],
-        list_of_property_values= [175, "Jay Ryan"],
+    jack_id = [
+        jack[0].get("Id") for jack in graph.search_for_entities("User", {"name":"Jack Ryan"})
+    ][0]
+    graph.create_or_update_property_of_entity(
+        id_=jack_id,
+        property_kind="height",
+        property_value= 175,
     )
+
+    # Update all users properties
     ontology.create_properties_of_kind("User", ["country"])
+    users_ids = [
+        user[0].get("Id") for user in graph.search_for_entities("User")
+    ]
     graph.create_or_update_properties_of_entities(
-        list_of_ids=["1","2"],
+        list_of_ids=users_ids,
         list_of_property_kinds=["country"],
         list_of_property_values=["Russia"],
     )
-    # Sandy does all her habits every Friday
+
+    theater_id = [
+        user[0].get("Id") for user in graph.search_for_entities("Interest", {"name":"Theater"})
+    ][0]
     graph.update_relationship(
-        "KEEPS_UP",
-        {"every": "Friday"},
-        id_a="2",
-        id_b="10",
+        "DISLIKES",
+        updates={"every": "Friday"},
+        id_a=jack_id,
+        id_b=theater_id,
     )
-    # Sandy started to do her habits, which are since March, as daily routine
-    graph.update_relationship(
-        "KEEPS_UP",
-        updates={"every": "day"},
-        id_a="2",
-        id_b="9",
-    )
-    graph.update_relationship(
-        "KEEPS_UP",
-        updates={"since": "February"},
-        id_a="2",
-        id_b="13",
-    )
+
+    uni_id = [
+        entity[0].get("Id") for entity in graph.search_for_entities(
+            "University", {"name": "Oxford"}
+        )
+    ][0]
+    dancing_id = [
+        entity[0].get("Id") for entity in graph.search_for_entities("Habit", {"name": "Dancing"})
+    ][0]
+    yoga_id = [
+        entity[0].get("Id") for entity in graph.search_for_entities("Habit", {"name": "Yoga"})
+    ][0]
+    graph.remove_relationship("STUDY", jack_id, uni_id)
+    graph.remove_relationship("KEEPS_UP", jack_id, dancing_id)
+    graph.create_relationship(jack_id, "KEEPS_UP", {}, yoga_id)
 
 
 def test_delete():
-    graph.delete_relationship(
+    smoking_id = [
+        item[0].get("Id") for item in graph.search_for_entities("Habit", {"name":"Smoking"})
+    ][0]
+    sandy_id = [
+        sandy[0].get("Id") for sandy in graph.search_for_entities("User", {"name":"Sandy Bates"})
+    ][0]
+    graph.remove_relationship(
         "KEEPS_UP",
-        id_a="1",
-        id_b="13",
+        id_a=sandy_id,
+        id_b=smoking_id,
     )
-    graph.delete_entity("1", completely=False)
+    graph.remove_entity(smoking_id)
 
 
 test_populate()
-test_search()
 test_update()
+test_search()
 test_delete()
