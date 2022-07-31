@@ -401,7 +401,7 @@ def create_relationship(
     rel_properties: dict,
     id_b: str,
     create_date: Optional[datetime.datetime] = None,
-):
+) -> Optional[neo4j_graph.Relationship]:
     """Finds entities A and B and set a relationship between them.
 
     Direction is from entity A to entity B.
@@ -414,8 +414,32 @@ def create_relationship(
       create_date: relationship creation date
 
     Returns:
+        neo4j relationship object in case of success or None in case of error
 
     """
+    if (a_node:= get_entity_by_id(id_a)) is not None:
+        kind_a = next(iter(a_node.labels))
+    else:
+        logging.error(
+            """Id '%s' is not defined in DB, relationship (%s,%s,%s) was not created""",
+            id_a, id_a, relationship_kind, id_b
+        )
+        return None
+    if (b_node:= get_entity_by_id(id_b)) is not None:
+        kind_b = next(iter(b_node.labels))
+    else:
+        logging.error("Id '%s' is not defined in DB", id_b)
+        return None
+    if not ontology.is_valid_relationship(
+        kind_a, relationship_kind, kind_b, list(rel_properties.keys())
+    ):
+        relationship_model = (kind_a, relationship_kind, kind_b)
+        logging.error(
+            """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid relationship """
+            """in ontology data model""", id_a, relationship_kind, id_b, relationship_model
+        )
+        return None
+
     if create_date is None:
         create_date = datetime.datetime.now()
     match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
@@ -427,7 +451,17 @@ def create_relationship(
     query = "\n".join([match_a, match_b, with_query, rel])
     params = {**filter_a, **filter_b, **rel_properties}
 
-    db.cypher_query(query, params)
+    try:
+        relationship, _ = db.cypher_query(query, params)
+        [[relationship]] = relationship
+    except ClientError as exc:
+        logging.error(
+            "No new relationship has been created.\nRaised error: %r\n"
+            "It could be because the relationship you're trying to create is already in database",
+            exc
+        )
+        return None
+    return relationship
 
 
 def search_relationships(

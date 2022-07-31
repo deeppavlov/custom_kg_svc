@@ -177,3 +177,110 @@ def are_properties_in_kind(list_of_property_kinds, kind):
                 Use create_properties_of_kind() function to add it""", prop, kind)
             return False
     return True
+
+
+def create_relationship_model(
+    kind_a: str, relationship_kind: str, kind_b: str, rel_properties: Optional[list] = None
+):
+    """create a relationship kind between two entity kinds
+    to make creation of such relationship in the graph possible.
+
+    Args:
+      kind_a: kind of first entity (from)
+      relationship_kind: kind of relationship
+      kind_b: kind of second entity (to)
+      rel_properties: list of properties, a relationship could have
+
+    Returns:
+
+    """
+    data_model = loader.load_ontology_data_model()
+    if rel_properties is None:
+        rel_properties = []
+
+    if data_model is None:
+        data_model = dict()
+    if relationship_kind in data_model:
+        if (kind_a, kind_b) not in [
+            (knd_a, knd_b) for (knd_a, knd_b, _) in data_model[relationship_kind]
+        ]:
+            data_model[relationship_kind].append([kind_a, kind_b, rel_properties])
+        else:
+            logging.info(
+                """Same relationship "(%s, %s, %s)" is already in the data model, """
+                """no new relationship kind was created""",
+                kind_a, relationship_kind, kind_b
+            )
+            return None
+    else:
+        data_model.update({
+            relationship_kind:[[kind_a, kind_b, rel_properties]]
+        })
+    loader.save_ontology_data_model(data_model)
+    logging.info(
+        """Relationship "(%s, %s, %s)" was added to data model""", kind_a, relationship_kind, kind_b
+    )
+
+
+def get_relationship_kind_details(relationship_kind: str) -> Optional[list]:
+    """Returns the relationship two-possible-parties as well as its properties."""
+    data_model = loader.load_ontology_data_model()
+    if data_model is not None:
+        kind = data_model.get(relationship_kind)
+        return kind
+    else:
+        return None
+
+
+def is_valid_relationship(kind_a, relationship_kind, kind_b, rel_properties) -> bool:
+    """Checks if a relationship between two kinds is valid in the data model.
+
+    Args:
+      kind_a: kind of first entity (from)
+      relationship_kind: kind of relationship
+      kind_b: kind of second entity (to)
+      rel_properties: list of properties, a relationship could have
+
+    Returns:
+      False in case the relationship is invalid (not in data model)
+      True in case it is valid
+
+    """
+    data_model = loader.load_ontology_data_model()
+    if data_model is None:
+        logging.error("The data model is empty")
+        return False
+    if relationship_kind not in data_model:
+        logging.error("Relationship kind '%s' is not in data model", relationship_kind)
+        return False
+    if (kind_a, kind_b) not in [
+        (knd_a, knd_b) for (knd_a, knd_b, _) in data_model[relationship_kind]
+    ]:
+        logging.error(
+            "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
+            relationship_kind, kind_a, kind_b
+        )
+        return False
+    for (model_a, model_b, model_properties) in data_model[relationship_kind]:
+        if (kind_a, kind_b) == (model_a, model_b):
+            for prop in rel_properties:
+                if prop not in model_properties:
+                    logging.error(
+                        """The property '%s' isn't in '%s' properties in ontology data model.
+                        Use create_properties_of_relationship_kind() function to add it""",
+                        prop,
+                        relationship_kind
+                    )
+                    return False
+    return True
+
+
+def show_data_model():
+    """Displays the data model in a pretty way."""
+    data_model = loader.load_ontology_data_model()
+    if data_model is None:
+        logging.info("The data model is empty")
+        return None
+    for relationship_kind in data_model:
+        for kind_a, kind_b, properties in data_model[relationship_kind]:
+            print(f"({kind_a})-[{relationship_kind} {{{properties}}}]->({kind_b})")

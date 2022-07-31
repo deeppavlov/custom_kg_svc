@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 import os
 import pickle
@@ -43,3 +44,19 @@ def store_id(id_):
     """Saves the given id to a db_ids file."""
     with open(ontology_settings.db_ids_file_path, "a", encoding="utf-8") as file:
         file.write(id_ +"\n")
+
+
+def load_ontology_data_model() -> Optional[dict]:
+    """Loads ontology data model json file and returns it as a dictionary."""
+    data_model = None
+    data_model_path = ontology_settings.ontology_data_model_path
+    if os.path.exists(data_model_path):
+        with open(data_model_path, "r", encoding='utf-8') as file:
+            data_model = json.load(file)
+    return data_model
+
+
+def save_ontology_data_model(data_model: dict):
+    """Dump a dictionary to ontology_data_model.json file."""
+    with open(ontology_settings.ontology_data_model_path, 'w', encoding='utf-8') as file:
+        json.dump(data_model, file, indent=4)

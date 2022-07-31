@@ -40,7 +40,7 @@ TEST_BOT_ENTITIES = [
 ]
 
 TEST_UNIVERSITY_ENTITIES = [
-    {"Id": "3.5", "properties": {"name": "Oxford"}}
+    {"Id": "3a5", "properties": {"name": "Oxford"}}
 ]
 
 TEST_INTEREST_ENTITIES = [
@@ -87,7 +87,7 @@ TEST_MATCHES = [
     ("2", "KEEPS_UP", {}, "9"),
     ("2", "KEEPS_UP", {}, "13"),
     ("1", "KEEPS_UP", {}, "13"),
-    ("1", "STUDY", {}, "3.5"),
+    ("1", "STUDY", {}, "3a5"),
     ("1", "LIKES", {}, "7"),
     ("1", "DISLIKES", {}, "4"),
     ("12", "CAUSES", {}, "14"),
@@ -111,6 +111,13 @@ def test_populate(drop=True):
             )
 
     for id_a, rel, rel_dict, id_b in TEST_MATCHES:
+        a_node = graph.get_entity_by_id(id_a)
+        kind_a = next(iter(a_node.labels))
+
+        b_node= graph.get_entity_by_id(id_b)
+        kind_b = next(iter(b_node.labels))
+        
+        ontology.create_relationship_model(kind_a, rel, kind_b, list(rel_dict.keys()))
         graph.create_relationship(id_a, rel, rel_dict,id_b)
 
 
@@ -168,7 +175,7 @@ def test_search():
 
     # complex query
     print("\nWhat were Jack's habits when he was at university?")
-    study_rels = graph.search_relationships("STUDY", id_a="1", id_b="3.5", search_all_states=True)
+    study_rels = graph.search_relationships("STUDY", id_a="1", id_b="3a5", search_all_states=True)
     state_ids_when_he_was_at_university = set()
     for rel in study_rels:
         state_id = rel[STATE_NODE_ORDER_IN_RELATIONSHIP_RESULT].id
