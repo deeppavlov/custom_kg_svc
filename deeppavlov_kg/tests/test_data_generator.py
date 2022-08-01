@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import datetime
-from deeppavlov_kg.utils.generate_data import (
+from deeppavlov_kg.tests.generate_data import (
+    graph,
     fake_update,
     generic,
     iterate_generate_1node_and_1rel,
     generate_specific_amount_of_data,
     set_date,
 )
-import deeppavlov_kg.core.graph as graph
 
 NUM_USERS = 1
 NUM_ENTITIES = 3

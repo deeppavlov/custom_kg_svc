@@ -1,6 +1,5 @@
 from datetime import datetime
-from deeppavlov_kg.core import ontology
-import deeppavlov_kg.core.graph as graph
+from deeppavlov_kg import KnowledgeGraph
 
 FROM_NODE_ORDER_IN_RELATIONSHIP_RESULT = 0
 HAS_STATE_RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT = 1
@@ -96,13 +95,21 @@ TEST_MATCHES = [
 ]
 
 
+graph = KnowledgeGraph(
+    "bolt://neo4j:neo4j@localhost:7687",
+    ontology_file_path="ontology_file.pickle",
+    ontology_data_model_path="ontology_data_model.json",
+    db_ids_file_path="db_ids.txt"
+)
+
+
 def test_populate(drop=True):
     if drop:
         graph.drop_database()
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
-            ontology.create_kind(
+            graph.ontology.create_kind(
                 kind,
                 kind_properties=set(entity_dict["properties"].keys()),
             )
@@ -117,7 +124,7 @@ def test_populate(drop=True):
         b_node= graph.get_entity_by_id(id_b)
         kind_b = next(iter(b_node.labels))
         
-        ontology.create_relationship_model(kind_a, rel, kind_b, list(rel_dict.keys()))
+        graph.ontology.create_relationship_model(kind_a, rel, kind_b, list(rel_dict.keys()))
         graph.create_relationship(id_a, rel, rel_dict,id_b)
 
 
@@ -196,7 +203,7 @@ def test_search():
 
 def test_update():
     # Update Jack's properties
-    ontology.create_properties_of_kind("User", ["height"])
+    graph.ontology.create_properties_of_kind("User", ["height"])
     jack_id = [
         jack[0].get("Id") for jack in graph.search_for_entities("User", {"name":"Jack Ryan"})
     ][0]
@@ -207,7 +214,7 @@ def test_update():
     )
 
     # Update all users properties
-    ontology.create_properties_of_kind("User", ["country"])
+    graph.ontology.create_properties_of_kind("User", ["country"])
     users_ids = [
         user[0].get("Id") for user in graph.search_for_entities("User")
     ]

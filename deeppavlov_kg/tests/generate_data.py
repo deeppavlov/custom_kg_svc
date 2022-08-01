@@ -9,8 +9,7 @@ from mimesis import Generic, Numeric
 from mimesis.locales import Locale
 from mimesis.schema import Field, Schema
 
-import deeppavlov_kg.core.graph as graph
-import deeppavlov_kg.core.ontology as ontology
+from deeppavlov_kg import KnowledgeGraph
 
 generic = Generic(locale=Locale.EN)
 fabulist = Fabulist()
@@ -97,6 +96,14 @@ node_properties = Schema(
 relationship_properties = Schema(schema=lambda: {"sometimes": fabulist.get_word("adv")})
 
 
+graph = KnowledgeGraph(
+    "bolt://neo4j:neo4j@localhost:7687",
+    ontology_file_path="ontology_file.pickle",
+    ontology_data_model_path="ontology_data_model.json",
+    db_ids_file_path="db_ids.txt"
+)
+
+
 def set_date(date):
     """Initializes the global vaiable date
 
@@ -173,7 +180,7 @@ def iterate_generate_1node_and_1rel(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
-        ontology.create_kind(
+        graph.ontology.create_kind(
             node_kind,
             parent=node_parent_kind,
             kind_properties=set(node["properties"].keys())
@@ -237,7 +244,7 @@ def fake_update(
                     return None
                 kinds_frozenset = entity.labels
                 kind = next(iter(kinds_frozenset))
-                ontology.create_properties_of_kind(
+                graph.ontology.create_properties_of_kind(
                     kind,
                     new_properties=list(properties_dict.keys())
                 )
@@ -300,7 +307,7 @@ def generate_specific_amount_of_data(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
-        ontology.create_kind(
+        graph.ontology.create_kind(
             node_kind,
             parent=node_parent_kind,
             kind_properties=set(node["properties"].keys())
