@@ -109,7 +109,7 @@ def test_populate(drop=True):
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
-            graph.ontology.create_kind(
+            graph.ontology.create_entity_kind(
                 kind,
                 kind_properties=set(entity_dict["properties"].keys()),
             )
@@ -203,7 +203,7 @@ def test_search():
 
 def test_update():
     # Update Jack's properties
-    graph.ontology.create_properties_of_kind("User", ["height"])
+    graph.ontology.create_entity_kind_properties("User", ["height"])
     jack_id = [
         jack[0].get("Id") for jack in graph.search_for_entities("User", {"name":"Jack Ryan"})
     ][0]
@@ -214,7 +214,7 @@ def test_update():
     )
 
     # Update all users properties
-    graph.ontology.create_properties_of_kind("User", ["country"])
+    graph.ontology.create_entity_kind_properties("User", ["country"])
     users_ids = [
         user[0].get("Id") for user in graph.search_for_entities("User")
     ]

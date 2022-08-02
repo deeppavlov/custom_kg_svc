@@ -55,7 +55,7 @@ class Ontology:
         with open(self.ontology_data_model_path, 'w', encoding='utf-8') as file:
             json.dump(data_model, file, indent=4)
 
-    def create_kind(
+    def create_entity_kind(
         self,
         kind: str,
         parent: str = "Kind",
@@ -92,7 +92,7 @@ class Ontology:
 
         parent_node = tree.get_node(parent)
         if parent_node is None:
-            tree = self.create_kind(parent, "Kind", tree)
+            tree = self.create_entity_kind(parent, "Kind", tree)
             parent_node = tree.get_node(parent)
             logging.warning(
                 "Not-in-database kind '%s'. Has been added as a child of 'Kind'", parent
@@ -115,7 +115,7 @@ class Ontology:
 
         return tree
 
-    def get_kind_node(self, tree: Optional[Tree], kind: str):
+    def get_node_from_tree(self, tree: Optional[Tree], kind: str):
         """Searches tree for kind and returns the kind node
 
         Returns:
@@ -131,10 +131,10 @@ class Ontology:
             return None
         return kind_node
 
-    def remove_kind(self, kind: str):
+    def remove_entity_kind(self, kind: str):
         """Removes kind from database/ontology_kinds_hierarchy"""
         tree = self._load_ontology_kinds_hierarchy()
-        if self.get_kind_node(tree, kind) is None:
+        if self.get_node_from_tree(tree, kind) is None:
             return None
 
         tree.remove_node(kind)
@@ -144,7 +144,7 @@ class Ontology:
             "Kind '%s' has been removed successfully from ontology graph", kind
         )
 
-    def update_properties_of_kind(
+    def update_entity_kind_properties(
         self, kind: str, old_properties: list, new_properties: list
     ):
         """Updates a list of properties of a given kind
@@ -153,7 +153,7 @@ class Ontology:
           kind node in case of success, None otherwise
         """
         tree = self._load_ontology_kinds_hierarchy()
-        kind_node = self.get_kind_node(tree, kind)
+        kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
@@ -168,14 +168,14 @@ class Ontology:
         self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
 
-    def create_properties_of_kind(self, kind: str, new_properties: list):
+    def create_entity_kind_properties(self, kind: str, new_properties: list):
         """Creates a list of properties of a given kind
 
         Returns:
           kind node in case of success, None otherwise
         """
         tree = self._load_ontology_kinds_hierarchy()
-        kind_node = self.get_kind_node(tree, kind)
+        kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
@@ -185,7 +185,7 @@ class Ontology:
         self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
 
-    def get_descendant_kinds(self, kind: str) -> Optional[list]:
+    def get_descendants_of_entity_kind(self, kind: str) -> Optional[list]:
         """Returns the children kinds of a given kind."""
         tree = self._load_ontology_kinds_hierarchy()
         descendants = []
@@ -197,19 +197,19 @@ class Ontology:
                 return None
         return descendants
 
-    def get_kind_properties(self, kind: str) -> Optional[set]:
+    def get_entity_kind_properties(self, kind: str) -> Optional[set]:
         """Returns the kind properties, stored in ontology graph"""
         tree = self._load_ontology_kinds_hierarchy()
-        kind_node = self.get_kind_node(tree, kind)
+        kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is not None:
             return kind_node.data.properties
         return set()
 
-    def are_properties_in_kind(self, list_of_property_kinds, kind):
+    def are_valid_entity_kind_properties(self, list_of_property_kinds, kind):
         """Checks if all the properties in the list are in fact properties of 'kind' in
         the ontology graph.
         """
-        kind_properties = self.get_kind_properties(kind)
+        kind_properties = self.get_entity_kind_properties(kind)
         for prop in list_of_property_kinds:
             if prop not in kind_properties:
                 logging.error(
@@ -337,4 +337,4 @@ class Ontology:
             return None
         for relationship_kind in data_model:
             for kind_a, kind_b, properties in data_model[relationship_kind]:
-                print(f"({kind_a})-[{relationship_kind} {{{properties}}}]->({kind_b})")
+                print(f"({kind_a})-[{relationship_kind} [{properties}]]->({kind_b})")

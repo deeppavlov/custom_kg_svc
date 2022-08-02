@@ -89,7 +89,7 @@ class KnowledgeGraph:
         if not self._is_identical_id(id_):
             logging.error("The same id exists in database")
             return None
-        if not self.ontology.are_properties_in_kind(state_properties, kind):
+        if not self.ontology.are_valid_entity_kind_properties(state_properties, kind):
             return None
         immutable_properties = {"Id": id_}
         query, params = querymaker.init_entity_query(
@@ -177,7 +177,7 @@ class KnowledgeGraph:
         where_query = ""
         if kind:
             if filter_by_children_kinds:
-                descendant_kinds = self.ontology.get_descendant_kinds(kind)
+                descendant_kinds = self.ontology.get_descendants_of_entity_kind(kind)
                 if descendant_kinds is None:
                     return []
                 kinds_to_search_for += descendant_kinds
@@ -274,7 +274,7 @@ class KnowledgeGraph:
             else:
                 kinds_frozenset = entity.labels
             kind = next(iter(kinds_frozenset))
-            if not self.ontology.are_properties_in_kind(list_of_property_kinds, kind):
+            if not self.ontology.are_valid_entity_kind_properties(list_of_property_kinds, kind):
                 return None
 
         match_a, _ = querymaker.match_node_query("a")

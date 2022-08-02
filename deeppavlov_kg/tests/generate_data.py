@@ -180,7 +180,7 @@ def iterate_generate_1node_and_1rel(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
-        graph.ontology.create_kind(
+        graph.ontology.create_entity_kind(
             node_kind,
             parent=node_parent_kind,
             kind_properties=set(node["properties"].keys())
@@ -244,7 +244,7 @@ def fake_update(
                     return None
                 kinds_frozenset = entity.labels
                 kind = next(iter(kinds_frozenset))
-                graph.ontology.create_properties_of_kind(
+                graph.ontology.create_entity_kind_properties(
                     kind,
                     new_properties=list(properties_dict.keys())
                 )
@@ -307,7 +307,7 @@ def generate_specific_amount_of_data(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
-        graph.ontology.create_kind(
+        graph.ontology.create_entity_kind(
             node_kind,
             parent=node_parent_kind,
             kind_properties=set(node["properties"].keys())
