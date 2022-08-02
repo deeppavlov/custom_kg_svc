@@ -23,23 +23,23 @@ class Kind:
 class Ontology:
     def __init__(
         self,
-        ontology_file_path: Union[Path, str],
+        ontology_kinds_hierarchy_path: Union[Path, str],
         ontology_data_model_path: Union[Path, str],
     ):
-        self.ontology_file_path = Path(ontology_file_path)
+        self.ontology_kinds_hierarchy_path = Path(ontology_kinds_hierarchy_path)
         self.ontology_data_model_path = Path(ontology_data_model_path)
 
-    def _load_ontology_graph(self) -> Optional[treelib.Tree]:
-        """Loads ontology_graph.pickle and returns it as a tree object."""
+    def _load_ontology_kinds_hierarchy(self) -> Optional[treelib.Tree]:
+        """Loads ontology_kinds_hierarchy.pickle and returns it as a tree object."""
         tree = None
-        if self.ontology_file_path.exists():
-            with open(self.ontology_file_path, "rb") as file:
+        if self.ontology_kinds_hierarchy_path.exists():
+            with open(self.ontology_kinds_hierarchy_path, "rb") as file:
                 tree = pickle.load(file)
         return tree
 
-    def _save_ontology_graph(self, tree: treelib.Tree):
-        """Uploads tree to database/ontology_graph.pickle."""
-        with open(self.ontology_file_path, "wb") as file:
+    def _save_ontology_kinds_hierarchy(self, tree: treelib.Tree):
+        """Uploads tree to database/ontology_kinds_hierarchy.pickle."""
+        with open(self.ontology_kinds_hierarchy_path, "wb") as file:
             pickle.dump(tree, file)
 
     def _load_ontology_data_model(self) -> Optional[dict]:
@@ -62,7 +62,7 @@ class Ontology:
         start_tree: Optional[Tree] = None,
         kind_properties: Optional[set] = None,
     ) -> Tree:
-        """Adds a given kind to the ontology_graph tree.
+        """Adds a given kind to the ontology_kinds_hierarchy tree.
 
         Args:
           kind: kind to be added
@@ -80,7 +80,7 @@ class Ontology:
         parent = parent.capitalize()
 
         if start_tree is None:
-            start_tree = self._load_ontology_graph()
+            start_tree = self._load_ontology_kinds_hierarchy()
             if start_tree is None:
                 start_tree = Tree()
                 start_tree.create_node(
@@ -107,7 +107,7 @@ class Ontology:
                 parent=parent,
                 data=Kind(kind_properties),
             )
-            self._save_ontology_graph(tree)
+            self._save_ontology_kinds_hierarchy(tree)
         except DuplicatedNodeIdError:
             logging.info(
                 "The '%s' kind exists in database. No new kind has been created", kind
@@ -132,14 +132,14 @@ class Ontology:
         return kind_node
 
     def remove_kind(self, kind: str):
-        """Removes kind from database/ontology_graph"""
-        tree = self._load_ontology_graph()
+        """Removes kind from database/ontology_kinds_hierarchy"""
+        tree = self._load_ontology_kinds_hierarchy()
         if self.get_kind_node(tree, kind) is None:
             return None
 
         tree.remove_node(kind)
 
-        self._save_ontology_graph(tree)
+        self._save_ontology_kinds_hierarchy(tree)
         logging.info(
             "Kind '%s' has been removed successfully from ontology graph", kind
         )
@@ -152,7 +152,7 @@ class Ontology:
         Returns:
           kind node in case of success, None otherwise
         """
-        tree = self._load_ontology_graph()
+        tree = self._load_ontology_kinds_hierarchy()
         kind_node = self.get_kind_node(tree, kind)
         if kind_node is None:
             return None
@@ -165,7 +165,7 @@ class Ontology:
                 logging.error("Property '%s' is not in '%s' properties", prop, kind)
                 return None
 
-        self._save_ontology_graph(tree)
+        self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
 
     def create_properties_of_kind(self, kind: str, new_properties: list):
@@ -174,7 +174,7 @@ class Ontology:
         Returns:
           kind node in case of success, None otherwise
         """
-        tree = self._load_ontology_graph()
+        tree = self._load_ontology_kinds_hierarchy()
         kind_node = self.get_kind_node(tree, kind)
         if kind_node is None:
             return None
@@ -182,12 +182,12 @@ class Ontology:
         for prop in new_properties:
             kind_node.data.properties.add(prop)
 
-        self._save_ontology_graph(tree)
+        self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
 
     def get_descendant_kinds(self, kind: str) -> Optional[list]:
         """Returns the children kinds of a given kind."""
-        tree = self._load_ontology_graph()
+        tree = self._load_ontology_kinds_hierarchy()
         descendants = []
         if tree:
             try:
@@ -199,7 +199,7 @@ class Ontology:
 
     def get_kind_properties(self, kind: str) -> Optional[set]:
         """Returns the kind properties, stored in ontology graph"""
-        tree = self._load_ontology_graph()
+        tree = self._load_ontology_kinds_hierarchy()
         kind_node = self.get_kind_node(tree, kind)
         if kind_node is not None:
             return kind_node.data.properties

@@ -98,9 +98,9 @@ relationship_properties = Schema(schema=lambda: {"sometimes": fabulist.get_word(
 
 graph = KnowledgeGraph(
     "bolt://neo4j:neo4j@localhost:7687",
-    ontology_file_path="ontology_file.pickle",
-    ontology_data_model_path="ontology_data_model.json",
-    db_ids_file_path="db_ids.txt"
+    ontology_kinds_hierarchy_path="deeppavlov_kg/database/ontology_kinds_hierarchy.pickle",
+    ontology_data_model_path="deeppavlov_kg/database/ontology_data_model.json",
+    db_ids_file_path="deeppavlov_kg/database/db_ids.txt"
 )
 
 

@@ -14,20 +14,20 @@ class KnowledgeGraph:
     def __init__(
         self,
         neo4j_bolt_url: str,
-        ontology_file_path: Union[Path, str],
+        ontology_kinds_hierarchy_path: Union[Path, str],
         ontology_data_model_path: Union[Path, str],
         db_ids_file_path: Union[Path, str],
     ):
         config.DATABASE_URL = neo4j_bolt_url
 
-        self.ontology = Ontology(ontology_file_path, ontology_data_model_path)
+        self.ontology = Ontology(ontology_kinds_hierarchy_path, ontology_data_model_path)
         self.db_ids_file_path = Path(db_ids_file_path)
 
     @classmethod
     def from_obj(cls, config_obj):
         return cls(
             neo4j_bolt_url=config_obj.neo4j_bolt_url,
-            ontology_file_path=config_obj.ontology_file_path,
+            ontology_kinds_hierarchy_path=config_obj.ontology_kinds_hierarchy_path,
             ontology_data_model_path=config_obj.ontology_data_model_path,
             db_ids_file_path=config_obj.db_ids_file_path,
         )
@@ -57,9 +57,9 @@ class KnowledgeGraph:
         """Clears database."""
         clear_neo4j_database(db)
 
-        ontology_file = self.ontology.ontology_file_path
-        if os.path.exists(ontology_file):
-            os.remove(ontology_file)
+        ontology_kinds_hierarchy = self.ontology.ontology_kinds_hierarchy_path
+        if os.path.exists(ontology_kinds_hierarchy):
+            os.remove(ontology_kinds_hierarchy)
 
         db_ids = self.db_ids_file_path
         if os.path.exists(db_ids):
