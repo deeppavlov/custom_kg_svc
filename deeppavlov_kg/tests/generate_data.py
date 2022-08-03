@@ -180,17 +180,29 @@ def iterate_generate_1node_and_1rel(
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
 
-        graph.ontology.create_entity_kind(
-            node_kind,
-            parent=node_parent_kind,
-            kind_properties=set(node["properties"].keys())
-        )
-
+        if not graph.ontology.is_valid_entity_kind(node_kind):
+            graph.ontology.create_entity_kind(
+                node_kind,
+                parent=node_parent_kind,
+                kind_properties=set(node["properties"].keys())
+            )
+        else:
+            graph.ontology.create_entity_kind_properties(
+                node_kind,
+                set(node["properties"].keys())                
+            )
         graph.create_entity(
             kind=node_kind,
             id_=node["properties"].pop("Id"),
             state_properties=node["properties"],
             create_date=node["properties"]["_creation_timestamp"],
+        )
+
+        graph.ontology.create_relationship_model(
+            next(iter(graph.get_entity_by_id(rel["start"]["Id"]).labels)),
+            rel["label"],
+            node_kind,
+            rel_properties=list(rel["properties"].keys())
         )
         graph.create_relationship(
             id_a=rel["start"]["Id"],
@@ -248,6 +260,11 @@ def fake_update(
                     kind,
                     new_properties=list(properties_dict.keys())
                 )
+
+                graph.ontology.create_entity_kind_properties(
+                    kind,
+                    list(properties_dict.keys())
+                )
                 graph.create_or_update_properties_of_entity(
                     id_=node_id,
                     list_of_property_kinds=list(properties_dict.keys()),
@@ -257,6 +274,12 @@ def fake_update(
             else:
                 rel = rand.get_random_item(relationships)
                 new_property = relationship_properties.create(iterations=1)[0]
+                graph.ontology.create_relationship_kind_properties(
+                    next(iter(graph.get_entity_by_id(rel["start"]["Id"]).labels)),
+                    rel["label"],
+                    next(iter(graph.get_entity_by_id(rel["end"]["Id"]).labels)),
+                    new_properties=[new_property],
+                )
                 graph.update_relationship(
                     relationship_kind=rel["label"],
                     updates=new_property,

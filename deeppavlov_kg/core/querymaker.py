@@ -123,6 +123,29 @@ def match_node_query(
     return query, properties_filter
 
 
+def set_property_query(var_name: str, properties_dict: dict):
+    """Prepare and sanitize SET CYPHER query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+      property_: the property label to be updated
+
+    Returns:
+      query string, disambiguated property label
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    properties_dict = sanitize_dict_keys(properties_dict)
+
+    updated_filter_dict = {f"new_{k}_{var_name}": v for k, v in properties_dict.items()}
+    param_placeholders = ", ".join(
+        f"{var_name}.{k}= $new_{k}_{var_name}" for k in properties_dict.keys()
+    )
+    query = f"SET {param_placeholders}"
+
+    return query, updated_filter_dict
+
+
 def patch_property_query(
     var_name: str,
     updates: dict,

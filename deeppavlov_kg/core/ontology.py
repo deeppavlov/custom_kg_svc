@@ -205,7 +205,13 @@ class Ontology:
             return kind_node.data.properties
         return set()
 
-    def are_valid_entity_kind_properties(self, list_of_property_kinds, kind):
+    def is_valid_entity_kind(self, kind: str) -> bool:
+        tree = self._load_ontology_kinds_hierarchy()
+        if tree is not None and tree.get_node(kind) is not None:
+            return True
+        return False
+
+    def are_valid_entity_kind_properties(self, list_of_property_kinds: list, kind: str):
         """Checks if all the properties in the list are in fact properties of 'kind' in
         the ontology graph.
         """
@@ -269,6 +275,27 @@ class Ontology:
             relationship_kind,
             kind_b,
         )
+
+    def create_relationship_kind_properties(
+        self,
+        kind_a: str,
+        relationship_kind: str,
+        kind_b: str,
+        new_properties: list,
+    ):
+        """Creates a list of properties of a given kind
+
+        Returns:
+          kind node in case of success, None otherwise
+        """
+        data_model = self._load_ontology_data_model()
+        if relationship_kind in data_model:
+            for idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
+                if (kind_a, kind_b) == (knd_a, knd_b):
+                    for prop in new_properties:
+                        data_model[relationship_kind][idx][2].append(prop)
+        else:
+            logging.error("Relationship_kind '%s' is not in data mode", relationship_kind)
 
     def get_relationship_kind_details(self, relationship_kind: str) -> Optional[list]:
         """Returns the relationship two-possible-parties as well as its properties."""

@@ -61,6 +61,10 @@ class KnowledgeGraph:
         if os.path.exists(ontology_kinds_hierarchy):
             os.remove(ontology_kinds_hierarchy)
 
+        data_model_file = self.ontology.ontology_data_model_path
+        if os.path.exists(data_model_file):
+            os.remove(data_model_file)
+
         db_ids = self.db_ids_file_path
         if os.path.exists(db_ids):
             os.remove(db_ids)
@@ -361,17 +365,16 @@ class KnowledgeGraph:
           State node in case of success or None in case of error.
         """
         current_state = self.get_current_state(id_)
-        if not current_state:
+        if current_state is None:
             logging.warning(
                 "No property was removed. No entity with specified id was found"
             )
             return None
+        if change_date is None:
+            change_date = datetime.datetime.now()
 
-        property_values = [""] * len(property_kinds)
-        self.create_or_update_properties_of_entity(
-            id_, property_kinds, property_values, change_date
-        )
 
+        self.create_new_state(id_, change_date)
         new_current_state = self.get_current_state(id_)
         if new_current_state is None:
             return None
@@ -619,14 +622,20 @@ class KnowledgeGraph:
         if change_date is None:
             change_date = datetime.datetime.now()
 
-        self.remove_relationship(relationship_kind, id_a, id_b, deletion_date=change_date)
-        self.create_relationship(
-            id_a=id_a,
-            relationship_kind=relationship_kind,
-            rel_properties=updates,
-            id_b=id_b,
-            create_date=change_date,
+        self.create_new_state(id_a, change_date)
+
+        # update relationship of the new state
+        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
+        match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
+        rel_match, filter_r = querymaker.match_relationship_versioner_query(
+            "a", "r", relationship_kind, {}, "b", state_relationship_kind="CURRENT"
         )
+        set_query, updated_updates = querymaker.set_property_query("r", updates)
+
+        params = {**filter_a, **filter_b, **filter_r, **updated_updates}
+        query = "\n".join([match_a, match_b, rel_match, set_query])
+
+        return db.cypher_query(query, params)
 
     def destroy_relationship(
         self,
@@ -738,6 +747,23 @@ class KnowledgeGraph:
                 exc,
             )
             return None
+
+    def create_new_state(self, id_: str, create_date: Optional[datetime.datetime] = None):
+        """Creates a new State node for an entity with the exact same
+        properties and relationships as the previous one
+
+        Args:
+          id_: id of entity, for which we're creating new state
+          create_date: New state creation date
+
+        """
+        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_})
+        set_query, _ = querymaker.patch_property_query(
+            "a", updates={}, change_date=create_date
+        )
+        return_query = querymaker.return_nodes_or_relationships_query(["node"])
+        query = "\n".join([match_a, set_query, return_query])
+        db.cypher_query(query, filter_a)
 
     def get_entities_states_by_date(self, list_of_ids: list, date_to_inspect: str):
         """Returns the active state nodes on a given date for many entities.
