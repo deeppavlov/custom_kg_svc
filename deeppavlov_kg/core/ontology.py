@@ -310,6 +310,12 @@ class Ontology:
         return set()
 
     def is_valid_entity_kind(self, kind: str) -> bool:
+        """Checks if a given kind exists in ontology kinds hierarchy.
+
+        Returns:
+          True in case it exists
+          False otherwise
+        """
         tree = self._load_ontology_kinds_hierarchy()
         if tree is not None and tree.get_node(kind) is not None:
             return True
@@ -330,6 +336,23 @@ class Ontology:
                 )
                 return False
         return True
+
+    def show_entity_kinds_hierarchy(self, with_properties: bool = False):
+        """Displays the ontology kinds hierarchy in form of tree.
+
+        Args:
+          with_properties: False to show kinds. True to show kind properties in the hierarchy.
+        """
+        tree = self._load_ontology_kinds_hierarchy()
+        if tree is None:
+            logging.error(
+                "Ontology kinds hierarchy is empty. Can't show entity kinds hierarchy"
+            )
+            return None
+        if with_properties:
+            tree.show(data_property="properties")
+        else:
+            tree.show()
 
     def create_relationship_model(
         self,
