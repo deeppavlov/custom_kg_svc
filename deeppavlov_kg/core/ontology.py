@@ -12,7 +12,7 @@ from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 class Kind:
     """A class to represent an entity. It's used as argument for treelib node data"""
 
-    def __init__(self, properties: set):
+    def __init__(self, properties: dict):
         """
         Args:
           properties: the state properties an entity has or could have in future
@@ -46,13 +46,13 @@ class Ontology:
         """Loads ontology data model json file and returns it as a dictionary."""
         data_model = None
         if self.ontology_data_model_path.exists():
-            with open(self.ontology_data_model_path, "r", encoding='utf-8') as file:
+            with open(self.ontology_data_model_path, "r", encoding="utf-8") as file:
                 data_model = json.load(file)
         return data_model
 
     def _save_ontology_data_model(self, data_model: dict):
         """Dump a dictionary to ontology_data_model.json file."""
-        with open(self.ontology_data_model_path, 'w', encoding='utf-8') as file:
+        with open(self.ontology_data_model_path, "w", encoding="utf-8") as file:
             json.dump(data_model, file, indent=4)
 
     def create_entity_kind(
@@ -61,6 +61,8 @@ class Ontology:
         parent: str = "Kind",
         start_tree: Optional[Tree] = None,
         kind_properties: Optional[set] = None,
+        kind_property_types: Optional[list] = None,
+        kind_property_measurement_units: Optional[list] = None,
     ) -> Tree:
         """Adds a given kind to the ontology_kinds_hierarchy tree.
 
@@ -69,6 +71,10 @@ class Ontology:
           parent: parent of kind
           start_tree: treelib.Tree object, to which the new kind should be added
           kind_properties: A set of properties for the created kind
+          kind_property_types: A list of property types that correspond to items in
+                               kind_properties respectively respectively by index
+          kind_property_measurement_units: A list of measurement units that correspond to items in
+                               kind_properties respectively by index
 
         Returns:
           tree object representing the ontology graph after the kind creation
@@ -76,6 +82,11 @@ class Ontology:
         """
         if kind_properties is None:
             kind_properties = set()
+        if kind_property_types is None:
+            kind_property_types = [""] * (len(kind_properties) + 1)
+        if kind_property_measurement_units is None:
+            kind_property_measurement_units = [""] * (len(kind_properties) + 1)
+
         kind = kind.capitalize()
         parent = parent.capitalize()
 
@@ -86,7 +97,7 @@ class Ontology:
                 start_tree.create_node(
                     tag="Kind",
                     identifier="Kind",
-                    data=Kind(set(["_deleted"])),
+                    data=Kind({"_deleted": {"type": bool, "measurement_unit": ""}}),
                 )
         tree = start_tree
 
@@ -97,15 +108,21 @@ class Ontology:
             logging.warning(
                 "Not-in-database kind '%s'. Has been added as a child of 'Kind'", parent
             )
-
-        kind_properties.update(parent_node.data.properties)  # type: ignore
+        kind_properties_dict = {}
+        for idx, prop in enumerate(kind_properties):
+            kind_properties_dict.update({prop: {"type": kind_property_types[idx]}})
+        for idx, prop in enumerate(kind_properties):
+            kind_properties_dict[prop].update(
+                {"measurement_unit": kind_property_measurement_units[idx]}
+            )
+        kind_properties_dict.update(parent_node.data.properties)  # type: ignore
 
         try:
             tree.create_node(
                 tag=kind,
                 identifier=kind,
                 parent=parent,
-                data=Kind(kind_properties),
+                data=Kind(kind_properties_dict),
             )
             self._save_ontology_kinds_hierarchy(tree)
         except DuplicatedNodeIdError:
@@ -145,45 +162,132 @@ class Ontology:
         )
 
     def update_entity_kind_properties(
-        self, kind: str, old_properties: list, new_properties: list
+        self,
+        kind: str,
+        old_property_kinds: list,
+        new_property_kinds: Optional[list] = None,
+        new_property_types: Optional[list] = None,
+        new_property_measurement_units: Optional[list] = None,
     ):
         """Updates a list of properties of a given kind
 
+        Args:
+          kind: Entity kind
+          old_property_kinds: Properties to be updated
+          new_property_kinds: New property kinds (If they were to be changed)
+          new_property_types: A list of property types that correspond to items in
+                               kind_properties respectively by index
+          new_property_measurement_unit: A list of measurement units that correspond to items in
+                               kind_properties respectively by index
+
         Returns:
           kind node in case of success, None otherwise
+
         """
+        for lst in [
+            new_property_kinds,
+            new_property_types,
+            new_property_measurement_units,
+        ]:
+            if lst is not None and len(lst) != len(old_property_kinds):
+                logging.error(
+                    "Number of old property kinds doesn't correspond properly with number of"
+                    "new property kinds, types or measurement_units. All should be equal"
+                )
+                return None
         tree = self._load_ontology_kinds_hierarchy()
+        if tree is None:
+            logging.error(
+                "Ontology kinds hierarchy is empty. Couldn't update entity kind properties"
+            )
+            return None
+
         kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
-        for idx, prop in enumerate(old_properties):
+        for idx, prop in enumerate(old_property_kinds):
             if prop in kind_node.data.properties:
-                kind_node.data.properties.remove(prop)
-                kind_node.data.properties.add(new_properties[idx])
+                prop_details = kind_node.data.properties[prop]
+                del kind_node.data.properties[prop]
+                if new_property_types is not None:
+                    prop_details["type"] = new_property_types[idx]
+                if new_property_measurement_units is not None:
+                    prop_details["measurement_unit"] = new_property_measurement_units[
+                        idx
+                    ]
+                properties_kinds = (
+                    old_property_kinds
+                    if new_property_kinds is None
+                    else new_property_kinds
+                )
+                kind_node.data.properties[properties_kinds[idx]] = prop_details
             else:
                 logging.error("Property '%s' is not in '%s' properties", prop, kind)
                 return None
 
         self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
+        return kind_node
 
-    def create_entity_kind_properties(self, kind: str, new_properties: list):
+    def create_entity_kind_properties(
+        self,
+        kind: str,
+        new_property_kinds: list,
+        new_property_types: Optional[list] = None,
+        new_property_measurement_units: Optional[list] = None,
+    ):
         """Creates a list of properties of a given kind
+
+        Args:
+          new_property_kinds: New property kinds
+          new_property_types: A list of property types that correspond to items in
+                               kind_properties respectively by index
+          new_property_measurement_unit: A list of measurement units that correspond to items in
+                               kind_properties respectively by index
 
         Returns:
           kind node in case of success, None otherwise
         """
+        if new_property_types is None:
+            new_property_types = [""] * len(new_property_kinds)
+        if new_property_measurement_units is None:
+            new_property_measurement_units = [""] * len(new_property_kinds)
+
+        if not (
+            len(new_property_kinds)
+            == len(new_property_types)
+            == len(new_property_measurement_units)
+        ):
+            logging.error(
+                "Number of new property kinds doesn't correspond properly with number of "
+                "new property types or measurement_units. All should be equal"
+            )
+            return None
+
         tree = self._load_ontology_kinds_hierarchy()
+        if tree is None:
+            logging.error(
+                "Ontology kinds hierarchy is empty. Couldn't create entity kind properties"
+            )
+            return None
         kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
-        for prop in new_properties:
-            kind_node.data.properties.add(prop)
+        for idx, prop in enumerate(new_property_kinds):
+            kind_node.data.properties.update(
+                {
+                    prop: {
+                        "type": new_property_types[idx],
+                        "measurement_unit": new_property_measurement_units[idx],
+                    }
+                }
+            )
 
         self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
+        return kind_node
 
     def get_descendants_of_entity_kind(self, kind: str) -> Optional[list]:
         """Returns the children kinds of a given kind."""
@@ -232,7 +336,9 @@ class Ontology:
         kind_a: str,
         relationship_kind: str,
         kind_b: str,
-        rel_properties: Optional[list] = None,
+        rel_property_kinds: Optional[list] = None,
+        kind_property_types: Optional[list] = None,
+        kind_property_measurement_units: Optional[list] = None,
     ):
         """create a relationship kind between two entity kinds
         to make creation of such relationship in the graph possible.
@@ -241,22 +347,40 @@ class Ontology:
           kind_a: kind of first entity (from)
           relationship_kind: kind of relationship
           kind_b: kind of second entity (to)
-          rel_properties: list of properties, a relationship could have
+          rel_property_kinds: list of properties, a relationship could have,
+          kind_property_types: A list of property types that correspond to items in
+                               rel_property_kinds respectively by index
+          kind_property_measurement_units: A list of measurement units that correspond to items in
+                               rel_property_kinds respectively by index
 
         Returns:
 
         """
-        data_model = self._load_ontology_data_model()
-        if rel_properties is None:
-            rel_properties = []
+        if rel_property_kinds is None:
+            rel_property_kinds = []
+        if kind_property_types is None:
+            kind_property_types = [""] * (len(rel_property_kinds) + 1)
+        if kind_property_measurement_units is None:
+            kind_property_measurement_units = [""] * (len(rel_property_kinds) + 1)
 
+        rel_properties_dict = {}
+        for idx, prop in enumerate(rel_property_kinds):
+            rel_properties_dict.update({prop: {"type": kind_property_types[idx]}})
+        for idx, prop in enumerate(rel_property_kinds):
+            rel_properties_dict[prop].update(
+                {"measurement_unit": kind_property_measurement_units[idx]}
+            )
+
+        data_model = self._load_ontology_data_model()
         if data_model is None:
             data_model = dict()
         if relationship_kind in data_model:
             if (kind_a, kind_b) not in [
                 (knd_a, knd_b) for (knd_a, knd_b, _) in data_model[relationship_kind]
             ]:
-                data_model[relationship_kind].append([kind_a, kind_b, rel_properties])
+                data_model[relationship_kind].append(
+                    [kind_a, kind_b, rel_properties_dict]
+                )
             else:
                 logging.info(
                     """Same relationship "(%s, %s, %s)" is already in the data model, """
@@ -267,7 +391,9 @@ class Ontology:
                 )
                 return None
         else:
-            data_model.update({relationship_kind: [[kind_a, kind_b, rel_properties]]})
+            data_model.update(
+                {relationship_kind: [[kind_a, kind_b, rel_properties_dict]]}
+            )
         self._save_ontology_data_model(data_model)
         logging.info(
             """Relationship "(%s, %s, %s)" was added to data model""",
@@ -281,21 +407,56 @@ class Ontology:
         kind_a: str,
         relationship_kind: str,
         kind_b: str,
-        new_properties: list,
+        new_property_kinds: list,
+        new_property_types: Optional[list] = None,
+        new_property_measurement_units: Optional[list] = None,
     ):
         """Creates a list of properties of a given kind
 
+        Args:
+          new_properties: list of properties, a relationship could have,
+          new_property_types: A list of property types that correspond to items in
+                              new_properties respectively by index
+          new_property_measurement_units: A list of measurement units that correspond to items in
+                              new_properties respectively by index
+
         Returns:
-          kind node in case of success, None otherwise
+          data model in case of success, None otherwise
         """
+        if new_property_types is None:
+            new_property_types = [""] * len(new_property_kinds)
+        if new_property_measurement_units is None:
+            new_property_measurement_units = [""] * len(new_property_kinds)
+
+        if not (
+            len(new_property_kinds)
+            == len(new_property_types)
+            == len(new_property_measurement_units)
+        ):
+            logging.error(
+                "Number of new properties kinds doesn't correspond properly with number of "
+                "new property kinds or values. All should be equal"
+            )
+            return None
+
         data_model = self._load_ontology_data_model()
+        if data_model is None:
+            logging.error("Data model is empty. Couldn't find relationships")
+            return None
         if relationship_kind in data_model:
             for idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
                 if (kind_a, kind_b) == (knd_a, knd_b):
-                    for prop in new_properties:
-                        data_model[relationship_kind][idx][2].append(prop)
+                    for prop in new_property_kinds:
+                        data_model[relationship_kind][idx][2][prop] = {
+                            "type": new_property_types[idx],
+                            "measurement_unit": new_property_measurement_units[idx],
+                        }
+            self._save_ontology_data_model(data_model)
         else:
-            logging.error("Relationship_kind '%s' is not in data mode", relationship_kind)
+            logging.error(
+                "Relationship_kind '%s' is not in data model", relationship_kind
+            )
+        return data_model
 
     def get_relationship_kind_details(self, relationship_kind: str) -> Optional[list]:
         """Returns the relationship two-possible-parties as well as its properties."""
