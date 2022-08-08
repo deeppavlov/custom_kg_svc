@@ -83,9 +83,9 @@ class Ontology:
         if kind_properties is None:
             kind_properties = set()
         if kind_property_types is None:
-            kind_property_types = [""] * (len(kind_properties) + 1)
+            kind_property_types = [str(str)] * (len(kind_properties))
         if kind_property_measurement_units is None:
-            kind_property_measurement_units = [""] * (len(kind_properties) + 1)
+            kind_property_measurement_units = [""] * (len(kind_properties))
 
         kind = kind.capitalize()
         parent = parent.capitalize()
@@ -250,7 +250,7 @@ class Ontology:
           kind node in case of success, None otherwise
         """
         if new_property_types is None:
-            new_property_types = [""] * len(new_property_kinds)
+            new_property_types = [str(str)] * len(new_property_kinds)
         if new_property_measurement_units is None:
             new_property_measurement_units = [""] * len(new_property_kinds)
 
@@ -324,13 +324,14 @@ class Ontology:
     def are_valid_entity_kind_properties(
         self,
         list_of_property_kinds: List[str],
+        list_of_property_values: List[Any],
         entity_kind: str
     ):
         """Checks if all the properties in the list are in fact properties of 'kind' in
         the ontology graph.
         """
         kind_properties = self.get_entity_kind_properties(entity_kind)
-        for prop in list_of_property_kinds:
+        for idx, prop in enumerate(list_of_property_kinds):
             if prop not in kind_properties:
                 logging.error(
                     """The property '%s' isn't in '%s' properties in ontology graph.
@@ -338,6 +339,11 @@ class Ontology:
                     prop,
                     entity_kind,
                 )
+                return False
+
+            property_type = kind_properties[prop]["type"]
+            if str(type(list_of_property_values[idx])) != property_type:
+                logging.error("Property '%s' should be of type: '%s'", prop, property_type)
                 return False
         return True
 
@@ -386,9 +392,9 @@ class Ontology:
         if rel_property_kinds is None:
             rel_property_kinds = []
         if kind_property_types is None:
-            kind_property_types = [""] * (len(rel_property_kinds) + 1)
+            kind_property_types = [str(str)] * (len(rel_property_kinds))
         if kind_property_measurement_units is None:
-            kind_property_measurement_units = [""] * (len(rel_property_kinds) + 1)
+            kind_property_measurement_units = [""] * (len(rel_property_kinds))
 
         rel_properties_dict = {}
         for idx, prop in enumerate(rel_property_kinds):
@@ -451,7 +457,7 @@ class Ontology:
           data model in case of success, None otherwise
         """
         if new_property_types is None:
-            new_property_types = [""] * len(new_property_kinds)
+            new_property_types = [str(str)] * len(new_property_kinds)
         if new_property_measurement_units is None:
             new_property_measurement_units = [""] * len(new_property_kinds)
 
@@ -500,6 +506,7 @@ class Ontology:
         relationship_kind: str,
         kind_b: str,
         rel_property_kinds: List[str],
+        rel_property_values: List[Any],
     ) -> bool:
         """Checks if a relationship between two kinds is valid in the data model.
 
@@ -535,7 +542,7 @@ class Ontology:
             return False
         for (model_a, model_b, model_properties) in data_model[relationship_kind]:
             if (kind_a, kind_b) == (model_a, model_b):
-                for prop in rel_property_kinds:
+                for idx, prop in enumerate(rel_property_kinds):
                     if prop not in model_properties:
                         logging.error(
                             """The property '%s' isn't in '%s' properties in ontology data model.
@@ -544,6 +551,11 @@ class Ontology:
                             relationship_kind,
                         )
                         return False
+                    else:
+                        property_type = model_properties[prop]["type"]
+                        if str(type(rel_property_values[idx])) != property_type:
+                            logging.error("Property '%s' should be of type: '%s'", prop, property_type)
+                            return False
         return True
 
     def show_data_model(

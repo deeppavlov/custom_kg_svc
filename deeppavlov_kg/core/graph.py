@@ -102,6 +102,7 @@ class KnowledgeGraph:
             return None
         if not self.ontology.are_valid_entity_kind_properties(
             property_kinds,
+            property_values,
             entity_kind=kind,
         ):
             return None
@@ -277,9 +278,17 @@ class KnowledgeGraph:
             )
             return None
 
-        if change_date is None:
-            change_date = datetime.datetime.now()
-        updates = dict(zip(list_of_property_kinds, list_of_property_values))
+        entities = self.get_entities_by_id(list_of_ids)
+        if entities:
+            for [entity] in entities:
+                kinds_frozenset = entity.labels
+                entity_kind = next(iter(kinds_frozenset))
+                if not self.ontology.are_valid_entity_kind_properties(
+                    list_of_property_kinds,
+                    list_of_property_values,
+                    entity_kind,
+                ):
+                    return None
 
         for id_ in list_of_ids:
             entity = self.get_entity_by_id(id_)
@@ -287,11 +296,6 @@ class KnowledgeGraph:
                 logging.error(
                     "Node with Id %s is not in database\nNothing has been updated", id_
                 )
-                return None
-            else:
-                kinds_frozenset = entity.labels
-            kind = next(iter(kinds_frozenset))
-            if not self.ontology.are_valid_entity_kind_properties(list_of_property_kinds, kind):
                 return None
         if change_date is None:
             change_date = datetime.datetime.now()
@@ -506,7 +510,7 @@ class KnowledgeGraph:
         if rel_property_values is None:
             rel_property_values = []
         if not self.ontology.is_valid_relationship(
-            kind_a, relationship_kind, kind_b, rel_property_kinds
+            kind_a, relationship_kind, kind_b, rel_property_kinds, rel_property_values
         ):
             relationship_model = (kind_a, relationship_kind, kind_b)
             logging.error(
@@ -702,7 +706,7 @@ class KnowledgeGraph:
             return_query_instead_of_relationships=True,
         )
         delete_query = querymaker.delete_relationship_cypher_query("r")
-        query = "\n".join([match_relationship, delete_query])
+        query = "\n".join([match_relationship, delete_query]) # type: ignore
 
         db.cypher_query(query, params)
 
