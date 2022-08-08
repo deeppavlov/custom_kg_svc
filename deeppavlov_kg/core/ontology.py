@@ -1,7 +1,7 @@
 import json
 import pickle
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Dict, List, Set, Optional, Union
 import logging
 
 import treelib
@@ -12,7 +12,7 @@ from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 class Kind:
     """A class to represent an entity. It's used as argument for treelib node data"""
 
-    def __init__(self, properties: dict):
+    def __init__(self, properties: Dict[str, Any]):
         """
         Args:
           properties: the state properties an entity has or could have in future
@@ -42,7 +42,7 @@ class Ontology:
         with open(self.ontology_kinds_hierarchy_path, "wb") as file:
             pickle.dump(tree, file)
 
-    def _load_ontology_data_model(self) -> Optional[dict]:
+    def _load_ontology_data_model(self) -> Optional[Dict[str, list]]:
         """Loads ontology data model json file and returns it as a dictionary."""
         data_model = None
         if self.ontology_data_model_path.exists():
@@ -60,9 +60,9 @@ class Ontology:
         kind: str,
         parent: str = "Kind",
         start_tree: Optional[Tree] = None,
-        kind_properties: Optional[set] = None,
-        kind_property_types: Optional[list] = None,
-        kind_property_measurement_units: Optional[list] = None,
+        kind_properties: Optional[Set[str]] = None,
+        kind_property_types: Optional[List[str]] = None,
+        kind_property_measurement_units: Optional[List[str]] = None,
     ) -> Tree:
         """Adds a given kind to the ontology_kinds_hierarchy tree.
 
@@ -164,10 +164,10 @@ class Ontology:
     def update_entity_kind_properties(
         self,
         kind: str,
-        old_property_kinds: list,
-        new_property_kinds: Optional[list] = None,
-        new_property_types: Optional[list] = None,
-        new_property_measurement_units: Optional[list] = None,
+        old_property_kinds: List[str],
+        new_property_kinds: Optional[List[str]] = None,
+        new_property_types: Optional[List[str]] = None,
+        new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Updates a list of properties of a given kind
 
@@ -233,9 +233,9 @@ class Ontology:
     def create_entity_kind_properties(
         self,
         kind: str,
-        new_property_kinds: list,
-        new_property_types: Optional[list] = None,
-        new_property_measurement_units: Optional[list] = None,
+        new_property_kinds: List[str],
+        new_property_types: Optional[List[str]] = None,
+        new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Creates a list of properties of a given kind
 
@@ -289,7 +289,7 @@ class Ontology:
         logging.info("Properties has been updated successfully")
         return kind_node
 
-    def get_descendants_of_entity_kind(self, kind: str) -> Optional[list]:
+    def get_descendants_of_entity_kind(self, kind: str) -> Optional[List[str]]:
         """Returns the children kinds of a given kind."""
         tree = self._load_ontology_kinds_hierarchy()
         descendants = []
@@ -301,13 +301,13 @@ class Ontology:
                 return None
         return descendants
 
-    def get_entity_kind_properties(self, kind: str) -> Optional[set]:
+    def get_entity_kind_properties(self, kind: str) -> Dict[str, dict]:
         """Returns the kind properties, stored in ontology graph"""
         tree = self._load_ontology_kinds_hierarchy()
         kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is not None:
             return kind_node.data.properties
-        return set()
+        return dict()
 
     def is_valid_entity_kind(self, kind: str) -> bool:
         """Checks if a given kind exists in ontology kinds hierarchy.
@@ -321,18 +321,22 @@ class Ontology:
             return True
         return False
 
-    def are_valid_entity_kind_properties(self, list_of_property_kinds: list, kind: str):
+    def are_valid_entity_kind_properties(
+        self,
+        list_of_property_kinds: List[str],
+        entity_kind: str
+    ):
         """Checks if all the properties in the list are in fact properties of 'kind' in
         the ontology graph.
         """
-        kind_properties = self.get_entity_kind_properties(kind)
+        kind_properties = self.get_entity_kind_properties(entity_kind)
         for prop in list_of_property_kinds:
             if prop not in kind_properties:
                 logging.error(
                     """The property '%s' isn't in '%s' properties in ontology graph.
                     Use create_properties_of_kind() function to add it""",
                     prop,
-                    kind,
+                    entity_kind,
                 )
                 return False
         return True
@@ -359,9 +363,9 @@ class Ontology:
         kind_a: str,
         relationship_kind: str,
         kind_b: str,
-        rel_property_kinds: Optional[list] = None,
-        kind_property_types: Optional[list] = None,
-        kind_property_measurement_units: Optional[list] = None,
+        rel_property_kinds: Optional[List[str]] = None,
+        kind_property_types: Optional[List[str]] = None,
+        kind_property_measurement_units: Optional[List[str]] = None,
     ):
         """create a relationship kind between two entity kinds
         to make creation of such relationship in the graph possible.
@@ -430,9 +434,9 @@ class Ontology:
         kind_a: str,
         relationship_kind: str,
         kind_b: str,
-        new_property_kinds: list,
-        new_property_types: Optional[list] = None,
-        new_property_measurement_units: Optional[list] = None,
+        new_property_kinds: List[str],
+        new_property_types: Optional[List[str]] = None,
+        new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Creates a list of properties of a given kind
 
@@ -481,7 +485,7 @@ class Ontology:
             )
         return data_model
 
-    def get_relationship_kind_details(self, relationship_kind: str) -> Optional[list]:
+    def get_relationship_kind_details(self, relationship_kind: str) -> Optional[List[List]]:
         """Returns the relationship two-possible-parties as well as its properties."""
         data_model = self._load_ontology_data_model()
         if data_model is not None:
@@ -491,7 +495,11 @@ class Ontology:
             return None
 
     def is_valid_relationship(
-        self, kind_a, relationship_kind, kind_b, rel_properties
+        self,
+        kind_a: str,
+        relationship_kind: str,
+        kind_b: str,
+        rel_property_kinds: List[str],
     ) -> bool:
         """Checks if a relationship between two kinds is valid in the data model.
 
@@ -527,7 +535,7 @@ class Ontology:
             return False
         for (model_a, model_b, model_properties) in data_model[relationship_kind]:
             if (kind_a, kind_b) == (model_a, model_b):
-                for prop in rel_properties:
+                for prop in rel_property_kinds:
                     if prop not in model_properties:
                         logging.error(
                             """The property '%s' isn't in '%s' properties in ontology data model.
