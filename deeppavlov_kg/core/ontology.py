@@ -366,9 +366,9 @@ class Ontology:
 
     def create_relationship_model(
         self,
-        kind_a: str,
         relationship_kind: str,
-        kind_b: str,
+        kind_a: str = "All",
+        kind_b: str = "All",
         rel_property_kinds: Optional[List[str]] = None,
         kind_property_types: Optional[List[str]] = None,
         kind_property_measurement_units: Optional[List[str]] = None,
@@ -530,16 +530,22 @@ class Ontology:
                 "Relationship kind '%s' is not in data model", relationship_kind
             )
             return False
-        if (kind_a, kind_b) not in [
-            (knd_a, knd_b) for (knd_a, knd_b, _) in data_model[relationship_kind]
-        ]:
-            logging.error(
-                "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
-                relationship_kind,
-                kind_a,
-                kind_b,
-            )
-            return False
+        for (knd_a, knd_b, _) in data_model[relationship_kind]:
+            if (
+                (knd_a == "All" and knd_b == kind_b) or
+                (knd_a == kind_a and knd_b == "All") or
+                (knd_a == "All" and knd_b == "All")
+            ):
+                continue
+            else:
+                logging.error(
+                    "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
+                    relationship_kind,
+                    kind_a,
+                    kind_b,
+                )
+                return False
+
         for (model_a, model_b, model_properties) in data_model[relationship_kind]:
             if (kind_a, kind_b) == (model_a, model_b):
                 for idx, prop in enumerate(rel_property_kinds):
