@@ -532,6 +532,7 @@ class Ontology:
             return False
         for (knd_a, knd_b, _) in data_model[relationship_kind]:
             if (
+                (knd_a == kind_a and knd_b == kind_b) or
                 (knd_a == "All" and knd_b == kind_b) or
                 (knd_a == kind_a and knd_b == "All") or
                 (knd_a == "All" and knd_b == "All")
