@@ -71,6 +71,22 @@ class Ontology:
             types_str.append(types.get(item))
         return types_str
 
+    def _get_node_from_tree(self, tree: Optional[Tree], kind: str):
+        """Searches tree for kind and returns the kind node
+
+        Returns:
+          kind node in case of success, None otherwise
+        """
+        if tree is None:
+            logging.error("Ontology graph is empty")
+            return None
+
+        kind_node = tree.get_node(kind)
+        if kind_node is None:
+            logging.error("Kind '%s' is not in ontology graph", kind)
+            return None
+        return kind_node
+
     def create_entity_kind(
         self,
         kind: str,
@@ -150,26 +166,10 @@ class Ontology:
 
         return tree
 
-    def get_node_from_tree(self, tree: Optional[Tree], kind: str):
-        """Searches tree for kind and returns the kind node
-
-        Returns:
-          kind node in case of success, None otherwise
-        """
-        if tree is None:
-            logging.error("Ontology graph is empty")
-            return None
-
-        kind_node = tree.get_node(kind)
-        if kind_node is None:
-            logging.error("Kind '%s' is not in ontology graph", kind)
-            return None
-        return kind_node
-
     def remove_entity_kind(self, kind: str):
         """Removes kind from database/ontology_kinds_hierarchy"""
         tree = self._load_ontology_kinds_hierarchy()
-        if self.get_node_from_tree(tree, kind) is None:
+        if self._get_node_from_tree(tree, kind) is None:
             return None
 
         tree.remove_node(kind)
@@ -223,7 +223,7 @@ class Ontology:
                 "Ontology kinds hierarchy is empty. Couldn't update entity kind properties"
             )
             return None
-        kind_node = self.get_node_from_tree(tree, kind)
+        kind_node = self._get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
@@ -290,7 +290,7 @@ class Ontology:
                 "Ontology kinds hierarchy is empty. Couldn't create entity kind properties"
             )
             return None
-        kind_node = self.get_node_from_tree(tree, kind)
+        kind_node = self._get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
 
@@ -323,7 +323,7 @@ class Ontology:
     def get_entity_kind_properties(self, kind: str) -> Dict[str, dict]:
         """Returns the kind properties, stored in ontology graph"""
         tree = self._load_ontology_kinds_hierarchy()
-        kind_node = self.get_node_from_tree(tree, kind)
+        kind_node = self._get_node_from_tree(tree, kind)
         if kind_node is not None:
             return kind_node.data.properties
         return dict()
@@ -385,7 +385,7 @@ class Ontology:
         else:
             tree.show()
 
-    def create_relationship_model(
+    def create_relationship_kind(
         self,
         relationship_kind: str,
         kind_a: str = "All",
