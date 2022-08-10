@@ -1,7 +1,8 @@
+import datetime
 import json
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Set, Optional, Union
+from typing import Any, Dict, List, Set, Type, Optional, Union
 import logging
 
 import treelib
@@ -55,13 +56,28 @@ class Ontology:
         with open(self.ontology_data_model_path, "w", encoding="utf-8") as file:
             json.dump(data_model, file, indent=4)
 
+    def _type2str(self, types_to_convert: List[Type]) -> List[str]:
+        """Converts list of types to a list of strings."""
+        types_str = []
+        types = {
+            str: str(str),
+            int: str(int),
+            float: str(float),
+            datetime.date: str(datetime.date),
+            datetime.time: str(datetime.time),
+            datetime.datetime: str(datetime.datetime),
+        }
+        for item in types_to_convert:
+            types_str.append(types.get(item))
+        return types_str
+
     def create_entity_kind(
         self,
         kind: str,
         parent: str = "Kind",
         start_tree: Optional[Tree] = None,
         kind_properties: Optional[Set[str]] = None,
-        kind_property_types: Optional[List[str]] = None,
+        kind_property_types: Optional[List[Type]] = None,
         kind_property_measurement_units: Optional[List[str]] = None,
     ) -> Tree:
         """Adds a given kind to the ontology_kinds_hierarchy tree.
@@ -83,7 +99,7 @@ class Ontology:
         if kind_properties is None:
             kind_properties = set()
         if kind_property_types is None:
-            kind_property_types = [str(str)] * (len(kind_properties))
+            kind_property_types = [str] * (len(kind_properties))
         if kind_property_measurement_units is None:
             kind_property_measurement_units = [""] * (len(kind_properties))
 
@@ -110,7 +126,9 @@ class Ontology:
             )
         kind_properties_dict = {}
         for idx, prop in enumerate(kind_properties):
-            kind_properties_dict.update({prop: {"type": kind_property_types[idx]}})
+            kind_properties_dict.update(
+                {prop: {"type": self._type2str(kind_property_types)[idx]}}
+            )
         for idx, prop in enumerate(kind_properties):
             kind_properties_dict[prop].update(
                 {"measurement_unit": kind_property_measurement_units[idx]}
@@ -166,7 +184,7 @@ class Ontology:
         kind: str,
         old_property_kinds: List[str],
         new_property_kinds: Optional[List[str]] = None,
-        new_property_types: Optional[List[str]] = None,
+        new_property_types: Optional[List[Type]] = None,
         new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Updates a list of properties of a given kind
@@ -184,6 +202,10 @@ class Ontology:
           kind node in case of success, None otherwise
 
         """
+        if new_property_types is None:
+            new_property_types = [str] * len(old_property_kinds)
+        if new_property_measurement_units is None:
+            new_property_measurement_units = [""] * len(old_property_kinds)
         for lst in [
             new_property_kinds,
             new_property_types,
@@ -201,7 +223,6 @@ class Ontology:
                 "Ontology kinds hierarchy is empty. Couldn't update entity kind properties"
             )
             return None
-
         kind_node = self.get_node_from_tree(tree, kind)
         if kind_node is None:
             return None
@@ -210,12 +231,10 @@ class Ontology:
             if prop in kind_node.data.properties:
                 prop_details = kind_node.data.properties[prop]
                 del kind_node.data.properties[prop]
-                if new_property_types is not None:
-                    prop_details["type"] = new_property_types[idx]
-                if new_property_measurement_units is not None:
-                    prop_details["measurement_unit"] = new_property_measurement_units[
-                        idx
-                    ]
+                prop_details["type"] = self._type2str(new_property_types)[idx]
+                prop_details["measurement_unit"] = new_property_measurement_units[
+                    idx
+                ]
                 properties_kinds = (
                     old_property_kinds
                     if new_property_kinds is None
@@ -234,7 +253,7 @@ class Ontology:
         self,
         kind: str,
         new_property_kinds: List[str],
-        new_property_types: Optional[List[str]] = None,
+        new_property_types: Optional[List[Type]] = None,
         new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Creates a list of properties of a given kind
@@ -250,7 +269,7 @@ class Ontology:
           kind node in case of success, None otherwise
         """
         if new_property_types is None:
-            new_property_types = [str(str)] * len(new_property_kinds)
+            new_property_types = [str] * len(new_property_kinds)
         if new_property_measurement_units is None:
             new_property_measurement_units = [""] * len(new_property_kinds)
 
@@ -279,7 +298,7 @@ class Ontology:
             kind_node.data.properties.update(
                 {
                     prop: {
-                        "type": new_property_types[idx],
+                        "type": self._type2str(new_property_types)[idx],
                         "measurement_unit": new_property_measurement_units[idx],
                     }
                 }
@@ -325,7 +344,7 @@ class Ontology:
         self,
         list_of_property_kinds: List[str],
         list_of_property_values: List[Any],
-        entity_kind: str
+        entity_kind: str,
     ):
         """Checks if all the properties in the list are in fact properties of 'kind' in
         the ontology graph.
@@ -343,7 +362,9 @@ class Ontology:
 
             property_type = kind_properties[prop]["type"]
             if str(type(list_of_property_values[idx])) != property_type:
-                logging.error("Property '%s' should be of type: '%s'", prop, property_type)
+                logging.error(
+                    "Property '%s' should be of type: '%s'", prop, property_type
+                )
                 return False
         return True
 
@@ -370,7 +391,7 @@ class Ontology:
         kind_a: str = "All",
         kind_b: str = "All",
         rel_property_kinds: Optional[List[str]] = None,
-        kind_property_types: Optional[List[str]] = None,
+        kind_property_types: Optional[List[Type]] = None,
         kind_property_measurement_units: Optional[List[str]] = None,
     ):
         """create a relationship kind between two entity kinds
@@ -392,13 +413,15 @@ class Ontology:
         if rel_property_kinds is None:
             rel_property_kinds = []
         if kind_property_types is None:
-            kind_property_types = [str(str)] * (len(rel_property_kinds))
+            kind_property_types = [str] * (len(rel_property_kinds))
         if kind_property_measurement_units is None:
             kind_property_measurement_units = [""] * (len(rel_property_kinds))
 
         rel_properties_dict = {}
         for idx, prop in enumerate(rel_property_kinds):
-            rel_properties_dict.update({prop: {"type": kind_property_types[idx]}})
+            rel_properties_dict.update(
+                {prop: {"type": self._type2str(kind_property_types)[idx]}}
+            )
         for idx, prop in enumerate(rel_property_kinds):
             rel_properties_dict[prop].update(
                 {"measurement_unit": kind_property_measurement_units[idx]}
@@ -441,7 +464,7 @@ class Ontology:
         relationship_kind: str,
         kind_b: str,
         new_property_kinds: List[str],
-        new_property_types: Optional[List[str]] = None,
+        new_property_types: Optional[List[Type]] = None,
         new_property_measurement_units: Optional[List[str]] = None,
     ):
         """Creates a list of properties of a given kind
@@ -457,7 +480,7 @@ class Ontology:
           data model in case of success, None otherwise
         """
         if new_property_types is None:
-            new_property_types = [str(str)] * len(new_property_kinds)
+            new_property_types = [str] * len(new_property_kinds)
         if new_property_measurement_units is None:
             new_property_measurement_units = [""] * len(new_property_kinds)
 
@@ -481,7 +504,7 @@ class Ontology:
                 if (kind_a, kind_b) == (knd_a, knd_b):
                     for prop in new_property_kinds:
                         data_model[relationship_kind][idx][2][prop] = {
-                            "type": new_property_types[idx],
+                            "type": self._type2str(new_property_types)[idx],
                             "measurement_unit": new_property_measurement_units[idx],
                         }
             self._save_ontology_data_model(data_model)
@@ -491,7 +514,10 @@ class Ontology:
             )
         return data_model
 
-    def get_relationship_kind_details(self, relationship_kind: str) -> Optional[List[List]]:
+
+    def get_relationship_kind_details(
+        self, relationship_kind: str
+    ) -> Optional[List[List]]:
         """Returns the relationship two-possible-parties as well as its properties."""
         data_model = self._load_ontology_data_model()
         if data_model is not None:
@@ -532,10 +558,10 @@ class Ontology:
             return False
         for (knd_a, knd_b, _) in data_model[relationship_kind]:
             if (
-                (knd_a == kind_a and knd_b == kind_b) or
-                (knd_a == "All" and knd_b == kind_b) or
-                (knd_a == kind_a and knd_b == "All") or
-                (knd_a == "All" and knd_b == "All")
+                (knd_a == kind_a and knd_b == kind_b)
+                or (knd_a == "All" and knd_b == kind_b)
+                or (knd_a == kind_a and knd_b == "All")
+                or (knd_a == "All" and knd_b == "All")
             ):
                 continue
             else:
@@ -561,7 +587,11 @@ class Ontology:
                     else:
                         property_type = model_properties[prop]["type"]
                         if str(type(rel_property_values[idx])) != property_type:
-                            logging.error("Property '%s' should be of type: '%s'", prop, property_type)
+                            logging.error(
+                                "Property '%s' should be of type: '%s'",
+                                prop,
+                                property_type,
+                            )
                             return False
         return True
 
