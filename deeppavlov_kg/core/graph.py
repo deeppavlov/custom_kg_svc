@@ -121,7 +121,7 @@ class KnowledgeGraph:
         kind: str,
         id_: str,
         property_kinds: List[str],
-        property_values: List[str],
+        property_values: List[Any],
         create_date: Optional[datetime.datetime] = None,
     ):
         """Creates new entity.
@@ -147,6 +147,9 @@ class KnowledgeGraph:
         if not self._is_identical_id(id_):
             logging.error("The same id exists in database")
             return None
+        property_kinds.append("_deleted")
+        property_values.append(False)
+
         if not self.ontology.are_valid_entity_kind_properties(
             property_kinds,
             property_values,
@@ -546,6 +549,9 @@ class KnowledgeGraph:
         ):
             return None
 
+        rel_property_kinds.append("_deleted")
+        rel_property_values.append(False)
+
         if create_date is None:
             create_date = datetime.datetime.now()
         match_a, filter_a = querymaker.match_node_query(
@@ -681,6 +687,15 @@ class KnowledgeGraph:
 
         if change_date is None:
             change_date = datetime.datetime.now()
+        if updated_property_kinds is None:
+            updated_property_kinds = []
+        if updated_property_values is None:
+            updated_property_values = []
+
+        if not self._is_valid_relationship(
+            id_a, relationship_kind, id_b, updated_property_kinds, updated_property_values
+        ):
+            return None
 
         self.create_new_state(id_a, change_date)
 

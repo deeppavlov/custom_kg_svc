@@ -63,6 +63,7 @@ class Ontology:
             str: str(str),
             int: str(int),
             float: str(float),
+            bool: str(bool),
             datetime.date: str(datetime.date),
             datetime.time: str(datetime.time),
             datetime.datetime: str(datetime.datetime),
@@ -118,6 +119,10 @@ class Ontology:
             kind_property_types = [str] * (len(kind_properties))
         if kind_property_measurement_units is None:
             kind_property_measurement_units = [""] * (len(kind_properties))
+        
+        if len(kind_property_types) != len(kind_property_measurement_units):
+            logging.error("Number of property types doesn't correspond properly with number of"
+                          " property measurement_units. They should be equal")
 
         kind = kind.capitalize()
         parent = parent.capitalize()
@@ -129,7 +134,9 @@ class Ontology:
                 start_tree.create_node(
                     tag="Kind",
                     identifier="Kind",
-                    data=Kind({"_deleted": {"type": bool, "measurement_unit": ""}}),
+                    data=Kind({
+                        "_deleted": {"type": str(bool), "measurement_unit": ""},
+                    }),
                 )
         tree = start_tree
 
@@ -391,8 +398,8 @@ class Ontology:
         kind_a: str = "All",
         kind_b: str = "All",
         rel_property_kinds: Optional[List[str]] = None,
-        kind_property_types: Optional[List[Type]] = None,
-        kind_property_measurement_units: Optional[List[str]] = None,
+        rel_property_types: Optional[List[Type]] = None,
+        rel_property_measurement_units: Optional[List[str]] = None,
     ):
         """create a relationship kind between two entity kinds
         to make creation of such relationship in the graph possible.
@@ -412,20 +419,24 @@ class Ontology:
         """
         if rel_property_kinds is None:
             rel_property_kinds = []
-        if kind_property_types is None:
-            kind_property_types = [str] * (len(rel_property_kinds))
-        if kind_property_measurement_units is None:
-            kind_property_measurement_units = [""] * (len(rel_property_kinds))
+        if rel_property_types is None:
+            rel_property_types = [str] * (len(rel_property_kinds))
+        if rel_property_measurement_units is None:
+            rel_property_measurement_units = [""] * (len(rel_property_kinds))
 
         rel_properties_dict = {}
         for idx, prop in enumerate(rel_property_kinds):
             rel_properties_dict.update(
-                {prop: {"type": self._type2str(kind_property_types)[idx]}}
+                {
+                    prop: {
+                        "type": self._type2str(rel_property_types)[idx],
+                        "measurement_unit": rel_property_measurement_units[idx],
+                    },
+                }
             )
-        for idx, prop in enumerate(rel_property_kinds):
-            rel_properties_dict[prop].update(
-                {"measurement_unit": kind_property_measurement_units[idx]}
-            )
+        rel_properties_dict.update({
+            "_deleted": {"type": str(bool), "measurement_unit": ""},
+        })
 
         data_model = self._load_ontology_data_model()
         if data_model is None:
