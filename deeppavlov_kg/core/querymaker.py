@@ -296,7 +296,10 @@ def match_relationship_cypher_query(
 
     """
     var_name_r = sanitize_alphanumeric(var_name_r)
-    relationship_kind = sanitize_alphanumeric(relationship_kind)
+    specify_kind = ""
+    if relationship_kind:
+        relationship_kind = sanitize_alphanumeric(relationship_kind)
+        specify_kind = f": {relationship_kind}"
     rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
     param_placeholders = ", ".join(f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter)
@@ -305,7 +308,7 @@ def match_relationship_cypher_query(
     }
     query = (
         f"MATCH ({var_name_a})"
-        f"-[{var_name_r}:{relationship_kind} {{{param_placeholders}}}]->"
+        f"-[{var_name_r} {specify_kind} {{{param_placeholders}}}]->"
         f"({var_name_b})"
     )
     return query, updated_rel_properties_filter

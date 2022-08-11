@@ -582,7 +582,7 @@ class KnowledgeGraph:
 
     def search_relationships(
         self,
-        relationship_kind: str,
+        relationship_kind: Optional[str] = None,
         rel_properties_filter: Optional[dict] = None,
         id_a: str = "",
         id_b: str = "",
@@ -617,6 +617,8 @@ class KnowledgeGraph:
         """
         if rel_properties_filter is None:
             rel_properties_filter = {}
+        if relationship_kind is None:
+            relationship_kind = ""
 
         a_properties_filter = {}
         b_properties_filter = {}
