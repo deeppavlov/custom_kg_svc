@@ -51,6 +51,53 @@ class KnowledgeGraph:
         with open(self.db_ids_file_path, "a", encoding="utf-8") as file:
             file.write(id_ + "\n")
 
+    def _is_valid_relationship(
+        self,
+        id_a,
+        relationship_kind,
+        id_b,
+        rel_property_kinds,
+        rel_property_values,
+    ):
+        """Checks if a relationship between two entities is valid according to the data model."""
+        if (a_node := self.get_entity_by_id(id_a)) is not None:
+            kind_a = next(iter(a_node.labels))
+        else:
+            logging.error(
+                """Id '%s' is not defined, in DB, relationship (%s,%s,%s) has not been created""",
+                id_a,
+                id_a,
+                relationship_kind,
+                id_b,
+            )
+            return False
+        if (b_node := self.get_entity_by_id(id_b)) is not None:
+            kind_b = next(iter(b_node.labels))
+        else:
+            logging.error(
+                """Id '%s' is not defined in DB, relationship (%s,%s,%s) has not been created""",
+                id_b,
+                id_a,
+                relationship_kind,
+                id_b,
+            )
+            return False
+
+        if not self.ontology.is_valid_relationship_model(
+            kind_a, relationship_kind, kind_b, rel_property_kinds, rel_property_values
+        ):
+            relationship_model = (kind_a, relationship_kind, kind_b)
+            logging.error(
+                """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid """
+                """relationship in ontology data model""",
+                id_a,
+                relationship_kind,
+                id_b,
+                relationship_model,
+            )
+            return False
+        return True
+
     def drop_database(
         self,
     ):
@@ -489,38 +536,14 @@ class KnowledgeGraph:
             neo4j relationship object in case of success or None in case of error
 
         """
-        if (a_node := self.get_entity_by_id(id_a)) is not None:
-            kind_a = next(iter(a_node.labels))
-        else:
-            logging.error(
-                """Id '%s' is not defined self, in DB, relationship (%s,%s,%s) was not created""",
-                id_a,
-                id_a,
-                relationship_kind,
-                id_b,
-            )
-            return None
-        if (b_node := self.get_entity_by_id(id_b)) is not None:
-            kind_b = next(iter(b_node.labels))
-        else:
-            logging.error("Id '%s' is not defined self, in DB", id_b)
-            return None
         if rel_property_kinds is None:
             rel_property_kinds = []
         if rel_property_values is None:
             rel_property_values = []
-        if not self.ontology.is_valid_relationship(
-            kind_a, relationship_kind, kind_b, rel_property_kinds, rel_property_values
+
+        if not self._is_valid_relationship(
+            id_a, relationship_kind, id_b, rel_property_kinds, rel_property_values
         ):
-            relationship_model = (kind_a, relationship_kind, kind_b)
-            logging.error(
-                """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid relationship """
-                """in ontology data model""",
-                id_a,
-                relationship_kind,
-                id_b,
-                relationship_model,
-            )
             return None
 
         if create_date is None:

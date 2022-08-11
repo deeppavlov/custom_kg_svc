@@ -526,7 +526,7 @@ class Ontology:
         else:
             return None
 
-    def is_valid_relationship(
+    def is_valid_relationship_model(
         self,
         kind_a: str,
         relationship_kind: str,
