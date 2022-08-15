@@ -821,6 +821,24 @@ class KnowledgeGraph:
             )
             return None
 
+    def get_previous_state(self, internal_state_id: int) -> Optional[neo4j_graph.Node]:
+        """Returns the State node connected with a give state by PREVIOUS relationship."""
+        match_a, _ = querymaker.match_node_query("s1", "State")
+        match_b, _ = querymaker.match_node_query("s2", "State")
+        where_query = querymaker.where_internal_id_equal_to(["s2"], [internal_state_id])
+        match_rel, _ = querymaker.match_relationship_cypher_query(
+            "s2", "r", "PREVIOUS", {}, var_name_b="s1"
+        )
+        return_query = querymaker.return_nodes_or_relationships_query(["s1"])
+
+        query = "\n".join([match_a, match_b, where_query, match_rel, return_query])
+        state, _ = db.cypher_query(query)
+        if state:
+            [[state]] = state
+            return state
+        else:
+            return None
+
     def create_new_state(self, id_: str, create_date: Optional[datetime.datetime] = None):
         """Creates a new State node for an entity with the exact same
         properties and relationships as the previous one
