@@ -1,6 +1,5 @@
-from typing import Optional
-from typing import Tuple
 import datetime
+from typing import List, Optional, Tuple
 
 
 def sanitize_alphanumeric(input_value: str):
@@ -452,7 +451,7 @@ def with_query(var_names: list) -> str:
     return query
 
 
-def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
+def where_internal_id_equal_to(var_names: List[str], values: List[int]) -> str:
     """Prepares and sanitize WHERE CYPHER query to add a constraint on internal id to the
        patterns in a MATCH clause.
 
@@ -466,10 +465,17 @@ def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
       query the CYPHER instruction form: WHERE id(var_name) = value
 
     """
-    var_name = sanitize_alphanumeric(var_name)
-    assert isinstance(value, int), "internal id value should be int"
+    if len(var_names) != len(values):
+        logging.error("Number of var_names and values should be equal")
+        return ""
+    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    for value in values:
+        assert isinstance(value, int), "internal id value should be int"
 
-    query = f"WHERE id({var_name}) = {value}"
+    query = f"id({var_names.pop()}) = {values.pop()}"
+    for var_name, value in zip(var_names, values):
+        query = " and ".join([query, f"id({var_name}) = {value}"])
+    query = " ".join(["WHERE", query])
     return query
 
 
@@ -549,4 +555,22 @@ def get_current_state_query(var_name: str) -> str:
     var_name = sanitize_alphanumeric(var_name)
     query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node"
 
+    return query
+
+def get_property_differences_query(state_from: str, state_to: str) -> str:
+    """Prepares and sanitizes versioner's diff query.
+
+    Args:
+      state_from: variable name of the first state
+      state_to: variable name of the second state
+
+    Returns:
+      query string
+    """
+    state_from = sanitize_alphanumeric(state_from)
+    state_to = sanitize_alphanumeric(state_to)
+    query = f"""
+        CALL graph.versioner.diff({state_from}, {state_to})
+        YIELD operation, label, oldValue, newValue
+    """
     return query

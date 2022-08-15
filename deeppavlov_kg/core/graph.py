@@ -450,8 +450,8 @@ class KnowledgeGraph:
             return None
 
         match_state, id_updated = querymaker.match_node_query("state", "State")
-        where_state = querymaker.where_node_internal_id_equal_to(
-            "state", new_current_state.id
+        where_state = querymaker.where_internal_id_equal_to(
+            ["state"], [new_current_state.id]
         )
         remove_state = querymaker.remove_properties_query("state", property_kinds)
         return_state = querymaker.return_nodes_or_relationships_query(["state"])
@@ -682,11 +682,6 @@ class KnowledgeGraph:
         Returns:
 
         """
-        # - It seems that it's not recommended to update relationship properties, as there is no
-        #   special function for doing that in the versioner.
-        # - Notice that you need to save the relationship's properties before deletion, in order to
-        #   use them in creating the new one.
-
         if change_date is None:
             change_date = datetime.datetime.now()
         if updated_property_kinds is None:
@@ -897,3 +892,88 @@ class KnowledgeGraph:
         else:
             logging.error("No state node")
             return None
+
+    def get_two_states_difference(
+        self, first_state_internal_id: int, second_state_internal_id: int
+    ) -> Tuple[List[str], List[str]]:
+        """Returns the difference between two states of one entity of the form:
+        (Differences in properties, differences in relationships).
+        """
+        match_a, _ = querymaker.match_node_query(
+            "first_state", kind="State"
+        )
+        match_b, _ = querymaker.match_node_query(
+            "second_state", kind="State"
+        )
+        where_query = querymaker.where_internal_id_equal_to(
+            ["first_state", "second_state"], [first_state_internal_id, second_state_internal_id]
+        )
+        diff_query = querymaker.get_property_differences_query("first_state", "second_state")
+        return_query = querymaker.return_nodes_or_relationships_query([
+            "operation", "label", "oldValue", "newValue"
+        ])
+        query = "\n".join([match_a, match_b, where_query, diff_query, return_query]) # type: ignore
+        differences_in_properties, _ = db.cypher_query(query)
+
+        # get relationships of first and second states
+        rels_of_states = {"first_state": [], "second_state": []}
+        for node in rels_of_states.copy():
+            match_r_node, _ = querymaker.match_node_query("r_node", "R")
+            match_rel, _ = querymaker.match_relationship_cypher_query(
+                node, "r", "", {}, "r_node"
+            )
+            return_query = querymaker.return_nodes_or_relationships_query(["r"])
+
+            query = "\n".join([
+                match_a, match_b, match_r_node, where_query, match_rel, return_query
+            ]) # type: ignore
+            rels, _ = db.cypher_query(query)
+            if rels:
+                rels_of_states[node] = [rel[0] for rel in rels]
+
+        # compare relationships
+        differences_in_relationships = []
+        first_state_rels = {
+            (rel.type, rel.nodes[1].id): rel for rel in rels_of_states["first_state"]
+        }
+        second_state_rels = {
+            (rel.type, rel.nodes[1].id): rel for rel in rels_of_states["second_state"]
+        }
+        for relationship in rels_of_states["first_state"]:
+            if (
+                rel:= (relationship.type, relationship.nodes[1].id)
+            ) in second_state_rels:
+                rel_from_props = dict(relationship.items())
+                rel_to_props = dict(second_state_rels[rel].items())
+
+                for prop in rel_from_props:
+                    if prop not in rel_to_props:
+                        differences_in_relationships.append(
+                            ["REMOVE", relationship.type, prop, rel_from_props[prop], None]
+                        )
+                    else:
+                        if rel_from_props[prop] != rel_to_props[prop]:
+                            differences_in_relationships.append(
+                                [
+                                    "UPDATE",
+                                    relationship.type,
+                                    prop,
+                                    rel_from_props[prop],
+                                    rel_to_props[prop]
+                                ]
+                            )
+                for prop in rel_to_props:
+                    if prop not in rel_from_props:
+                        differences_in_relationships.append(
+                            ["ADD", relationship.type, prop, None, rel_to_props[prop]]
+                        )
+            else:
+                differences_in_relationships.append(
+                    ["REMOVE", relationship.type, relationship.nodes[1].id]
+                )
+        for relationship in rels_of_states["second_state"]:
+            if (relationship.type, relationship.nodes[1].id) not in first_state_rels:
+                differences_in_relationships.append(
+                    ["ADD", relationship.type, relationship.nodes[1].id]
+                )
+        return differences_in_properties, differences_in_relationships
