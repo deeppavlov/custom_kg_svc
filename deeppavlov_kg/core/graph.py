@@ -98,6 +98,21 @@ class KnowledgeGraph:
             return False
         return True
 
+    def _get_entity_by_r_node_id(self, r_node_internal_id: int) -> Optional[neo4j_graph.Node]:
+        """Returns the entity related to an R node with FOR relationship."""
+        match_a, _ = querymaker.match_node_query("a", "R")
+        rel_match, _ = querymaker.match_relationship_cypher_query("a", "r", "FOR", {}, "b")
+        where_query = querymaker.where_internal_id_equal_to(["a"], [r_node_internal_id])
+        return_query = querymaker.return_nodes_or_relationships_query(["b"])
+
+        query = "\n".join([match_a, rel_match, where_query, return_query])
+        nodes, _ = db.cypher_query(query)
+        if nodes:
+            [[entity]] = nodes
+            return entity
+        else:
+            return None
+
     def drop_database(
         self,
     ):
@@ -986,12 +1001,16 @@ class KnowledgeGraph:
                             ["ADD", relationship.type, prop, None, rel_to_props[prop]]
                         )
             else:
+                r_node_id = relationship.nodes[1].id
+                second_entity_kind = next(iter(self._get_entity_by_r_node_id(r_node_id).labels))
                 differences_in_relationships.append(
-                    ["REMOVE", relationship.type, relationship.nodes[1].id]
+                    ["REMOVE", relationship.type, second_entity_kind]
                 )
         for relationship in rels_of_states["second_state"]:
             if (relationship.type, relationship.nodes[1].id) not in first_state_rels:
+                r_node_id = relationship.nodes[1].id
+                second_entity_kind = next(iter(self._get_entity_by_r_node_id(r_node_id).labels))
                 differences_in_relationships.append(
-                    ["ADD", relationship.type, relationship.nodes[1].id]
+                    ["ADD", relationship.type, second_entity_kind]
                 )
         return differences_in_properties, differences_in_relationships
