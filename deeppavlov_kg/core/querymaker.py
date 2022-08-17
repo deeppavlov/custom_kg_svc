@@ -1,6 +1,6 @@
-from typing import Optional
-from typing import Tuple
 import datetime
+import logging
+from typing import List, Optional, Tuple
 
 
 def sanitize_alphanumeric(input_value: str):
@@ -36,7 +36,7 @@ def sanitize_id(input_value: str):
     Returns:
 
     """
-    return "".join(char for char in input_value if char.isalnum() or char in ["_","-"])
+    return "".join(char for char in input_value if char.isalnum() or char in ["_", "-"])
 
 
 def verify_date_validity(date_: str):
@@ -68,11 +68,15 @@ def init_entity_query(
     immutable_properties = sanitize_dict_keys(immutable_properties)
     state_properties = sanitize_dict_keys(state_properties)
 
-    immutable_prop_placeholders = ", ".join(f"{k}: $new_{k}" for k in immutable_properties)
+    immutable_prop_placeholders = ", ".join(
+        f"{k}: $new_{k}" for k in immutable_properties
+    )
     state_prop_placeholders = ", ".join(f"{k}: $new_{k}" for k in state_properties)
 
-    updated_immutable_properties = {f"new_{k}":v for k,v in immutable_properties.items()}
-    updated_state_properties = {f"new_{k}":v for k,v in state_properties.items()}
+    updated_immutable_properties = {
+        f"new_{k}": v for k, v in immutable_properties.items()
+    }
+    updated_state_properties = {f"new_{k}": v for k, v in state_properties.items()}
     params = {**updated_immutable_properties, **updated_state_properties}
 
     create_date_str = create_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
@@ -115,7 +119,9 @@ def match_node_query(
         specify_kind = f": {kind}"
 
     if properties_filter:
-        param_placeholders = ", ".join(f"{k}: ${k}_{var_name}" for k in properties_filter)
+        param_placeholders = ", ".join(
+            f"{k}: ${k}_{var_name}" for k in properties_filter
+        )
         properties_filter = {f"{k}_{var_name}": v for k, v in properties_filter.items()}
         specify_param_placeholders = f"{{{param_placeholders}}})"
 
@@ -222,8 +228,7 @@ def return_nodes_or_relationships_query(var_names: list):
 
 
 def limit_query(max_limit: int):
-    """Prepares CYPHER LIMIT query.
-    """
+    """Prepares CYPHER LIMIT query."""
     assert isinstance(max_limit, int)
     query = f"LIMIT {max_limit}"
     return query
@@ -258,7 +263,7 @@ def create_relationship_query(
     rel_properties = sanitize_dict_keys(rel_properties)
 
     param_placeholders = ", ".join(f"{k}: $new_{k}" for k in rel_properties)
-    updated_rel_properties = {f"new_{k}":v for k,v in rel_properties.items()}
+    updated_rel_properties = {f"new_{k}": v for k, v in rel_properties.items()}
 
     create_date_str = create_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
     query = f"""CALL graph.versioner.relationship.create(
@@ -296,16 +301,21 @@ def match_relationship_cypher_query(
 
     """
     var_name_r = sanitize_alphanumeric(var_name_r)
-    relationship_kind = sanitize_alphanumeric(relationship_kind)
+    specify_kind = ""
+    if relationship_kind:
+        relationship_kind = sanitize_alphanumeric(relationship_kind)
+        specify_kind = f": {relationship_kind}"
     rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
-    param_placeholders = ", ".join(f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter)
+    param_placeholders = ", ".join(
+        f"{k}: ${k}_{var_name_r}" for k in rel_properties_filter
+    )
     updated_rel_properties_filter = {
         f"{k}_{var_name_r}": v for k, v in rel_properties_filter.items()
     }
     query = (
         f"MATCH ({var_name_a})"
-        f"-[{var_name_r}:{relationship_kind} {{{param_placeholders}}}]->"
+        f"-[{var_name_r} {specify_kind} {{{param_placeholders}}}]->"
         f"({var_name_b})"
     )
     return query, updated_rel_properties_filter
@@ -340,7 +350,7 @@ def match_relationship_versioner_query(
         var_name_r=state_relationship_kind.lower(),
         relationship_kind=state_relationship_kind,
         rel_properties_filter={},
-        var_name_b="state"
+        var_name_b="state",
     )
     r_node_query, _ = match_node_query("r_node", "R")
     relationship_query, rel_properties_filter = match_relationship_cypher_query(
@@ -348,7 +358,7 @@ def match_relationship_versioner_query(
         var_name_r=var_name_r,
         relationship_kind=relationship_kind,
         rel_properties_filter=rel_properties_filter,
-        var_name_b='r_node'
+        var_name_b="r_node",
     )
     for_rel_query, _ = match_relationship_cypher_query(
         var_name_a="r_node",
@@ -357,14 +367,23 @@ def match_relationship_versioner_query(
         rel_properties_filter={},
         var_name_b=var_name_b,
     )
-    query = "\n".join([
-        state_node_query, current_rel_query, r_node_query, relationship_query, for_rel_query
-    ])
+    query = "\n".join(
+        [
+            state_node_query,
+            current_rel_query,
+            r_node_query,
+            relationship_query,
+            for_rel_query,
+        ]
+    )
     return query, rel_properties_filter
 
 
 def delete_relationship_versioner_query(
-    var_name_a: str, relationship_kind: str, var_name_b: str, change_date: datetime.datetime
+    var_name_a: str,
+    relationship_kind: str,
+    var_name_b: str,
+    change_date: datetime.datetime,
 ) -> str:
     """Prepares and sanitizes versioner's delete CYPHER query for relationship deletion.
 
@@ -449,7 +468,7 @@ def with_query(var_names: list) -> str:
     return query
 
 
-def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
+def where_internal_id_equal_to(var_names: List[str], values: List[int]) -> str:
     """Prepares and sanitize WHERE CYPHER query to add a constraint on internal id to the
        patterns in a MATCH clause.
 
@@ -463,14 +482,23 @@ def where_node_internal_id_equal_to(var_name: str, value: int) -> str:
       query the CYPHER instruction form: WHERE id(var_name) = value
 
     """
-    var_name = sanitize_alphanumeric(var_name)
-    assert isinstance(value, int), "internal id value should be int"
+    if len(var_names) != len(values):
+        logging.error("Number of var_names and values should be equal")
+        return ""
+    var_names = [sanitize_alphanumeric(var_name) for var_name in var_names]
+    for value in values:
+        assert isinstance(value, int), "internal id value should be int"
 
-    query = f"WHERE id({var_name}) = {value}"
+    query = f"id({var_names.pop()}) = {values.pop()}"
+    for var_name, value in zip(var_names, values):
+        query = " and ".join([query, f"id({var_name}) = {value}"])
+    query = " ".join(["WHERE", query])
     return query
 
 
-def where_property_value_in_list_query(var_name:str, property_kind:"str", values:list) -> str:
+def where_property_value_in_list_query(
+    var_name: str, property_kind: "str", values: list
+) -> str:
     """Prepares and sanitizes WHERE-IN CYPHER query.
 
     Should be used together with match_query.
@@ -491,7 +519,7 @@ def where_property_value_in_list_query(var_name:str, property_kind:"str", values
     return query
 
 
-def where_entity_kind_in_list_query(var_name:str, kinds:list) -> str:
+def where_entity_kind_in_list_query(var_name: str, kinds: list) -> str:
     """Prepares and sanitizes a query to check if any kind in "kinds" is in var_name node kinds.
 
     Should be
@@ -526,8 +554,10 @@ def where_state_on_date(date_: str) -> str:
 
     """
     verify_date_validity(date_)
-    query = (f"WHERE has_state.startDate <=localdatetime('{date_}')"
-             f" and (has_state.endDate >=localdatetime('{date_}') or has_state.endDate is null)")
+    query = (
+        f"WHERE has_state.startDate <=localdatetime('{date_}')"
+        f" and (has_state.endDate >=localdatetime('{date_}') or has_state.endDate is null)"
+    )
     return query
 
 
@@ -546,4 +576,23 @@ def get_current_state_query(var_name: str) -> str:
     var_name = sanitize_alphanumeric(var_name)
     query = f"CALL graph.versioner.get.current.state({var_name}) YIELD node"
 
+    return query
+
+
+def get_property_differences_query(state_from: str, state_to: str) -> str:
+    """Prepares and sanitizes versioner's diff query.
+
+    Args:
+      state_from: variable name of the first state
+      state_to: variable name of the second state
+
+    Returns:
+      query string
+    """
+    state_from = sanitize_alphanumeric(state_from)
+    state_to = sanitize_alphanumeric(state_to)
+    query = f"""
+        CALL graph.versioner.diff({state_from}, {state_to})
+        YIELD operation, label, oldValue, newValue
+    """
     return query

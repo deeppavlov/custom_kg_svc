@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional, List, Tuple, Union
+from typing import Any, Optional, List, Tuple, Union
 import logging
 import datetime
 from neomodel import db, config, clear_neo4j_database
@@ -20,7 +20,9 @@ class KnowledgeGraph:
     ):
         config.DATABASE_URL = neo4j_bolt_url
 
-        self.ontology = Ontology(ontology_kinds_hierarchy_path, ontology_data_model_path)
+        self.ontology = Ontology(
+            ontology_kinds_hierarchy_path, ontology_data_model_path
+        )
         self.db_ids_file_path = Path(db_ids_file_path)
 
     @classmethod
@@ -51,6 +53,72 @@ class KnowledgeGraph:
         with open(self.db_ids_file_path, "a", encoding="utf-8") as file:
             file.write(id_ + "\n")
 
+    def _is_valid_relationship(
+        self,
+        id_a,
+        relationship_kind,
+        id_b,
+        rel_property_kinds,
+        rel_property_values,
+    ):
+        """Checks if a relationship between two entities is valid according to the data model."""
+        if (a_node := self.get_entity_by_id(id_a)) is not None:
+            kind_a = next(iter(a_node.labels))
+        else:
+            logging.error(
+                """Id '%s' is not defined, in DB, relationship (%s,%s,%s) has not been created""",
+                id_a,
+                id_a,
+                relationship_kind,
+                id_b,
+            )
+            return False
+        if (b_node := self.get_entity_by_id(id_b)) is not None:
+            kind_b = next(iter(b_node.labels))
+        else:
+            logging.error(
+                """Id '%s' is not defined in DB, relationship (%s,%s,%s) has not been created""",
+                id_b,
+                id_a,
+                relationship_kind,
+                id_b,
+            )
+            return False
+
+        if not self.ontology.is_valid_relationship_model(
+            kind_a, relationship_kind, kind_b, rel_property_kinds, rel_property_values
+        ):
+            relationship_model = (kind_a, relationship_kind, kind_b)
+            logging.error(
+                """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid """
+                """relationship in ontology data model""",
+                id_a,
+                relationship_kind,
+                id_b,
+                relationship_model,
+            )
+            return False
+        return True
+
+    def _get_entity_by_r_node_id(
+        self, r_node_internal_id: int
+    ) -> Optional[neo4j_graph.Node]:
+        """Returns the entity related to an R node with FOR relationship."""
+        match_a, _ = querymaker.match_node_query("a", "R")
+        rel_match, _ = querymaker.match_relationship_cypher_query(
+            "a", "r", "FOR", {}, "b"
+        )
+        where_query = querymaker.where_internal_id_equal_to(["a"], [r_node_internal_id])
+        return_query = querymaker.return_nodes_or_relationships_query(["b"])
+
+        query = "\n".join([match_a, rel_match, where_query, return_query])
+        nodes, _ = db.cypher_query(query)
+        if nodes:
+            [[entity]] = nodes
+            return entity
+        else:
+            return None
+
     def drop_database(
         self,
     ):
@@ -73,7 +141,8 @@ class KnowledgeGraph:
         self,
         kind: str,
         id_: str,
-        state_properties: dict,
+        property_kinds: List[str],
+        property_values: List[Any],
         create_date: Optional[datetime.datetime] = None,
     ):
         """Creates new entity.
@@ -81,23 +150,39 @@ class KnowledgeGraph:
         Args:
           kind: entity kind
           id_: Entity id
-          state_properties: A Map representing the Entity state properties (mutable).
+          property_kinds: Entity properties
+          property_values: Entity property values
           create_date: entity creation date
-          parent_kind: parent of kind. e.g. Dog -> Animal
 
         Returns:
           created entity in case of success, None otherwise
         """
+        if len(property_kinds) != len(property_values):
+            logging.error(
+                "Number of property kinds doesn't correspond properly with number of property "
+                "values. Should be equal"
+            )
+            return None
         if create_date is None:
             create_date = datetime.datetime.now()
         if not self._is_identical_id(id_):
             logging.error("The same id exists in database")
             return None
-        if not self.ontology.are_valid_entity_kind_properties(state_properties, kind):
+        property_kinds.append("_deleted")
+        property_values.append(False)
+
+        if not self.ontology.are_valid_entity_kind_properties(
+            property_kinds,
+            property_values,
+            entity_kind=kind,
+        ):
             return None
         immutable_properties = {"Id": id_}
         query, params = querymaker.init_entity_query(
-            kind, immutable_properties, state_properties, create_date
+            kind,
+            immutable_properties,
+            dict(zip(property_kinds, property_values)),
+            create_date,
         )
         return_query = querymaker.return_nodes_or_relationships_query(["node"])
         query = "\n".join([query, return_query])
@@ -130,7 +215,9 @@ class KnowledgeGraph:
         return entity
 
     # Needed for batch operations.
-    def get_entities_by_id(self, list_of_ids: list) -> Optional[List[neo4j_graph.Node]]:
+    def get_entities_by_id(
+        self, list_of_ids: List[str]
+    ) -> Optional[List[neo4j_graph.Node]]:
         """Looks up for and return entities with given ids.
 
         Args:
@@ -160,7 +247,7 @@ class KnowledgeGraph:
         properties_filter: Optional[dict] = None,
         filter_by_children_kinds: bool = False,
         limit=10,
-    ) -> list:
+    ) -> List[List[neo4j_graph.Node]]:
         """Searches existing entities.
 
         Args:
@@ -241,9 +328,9 @@ class KnowledgeGraph:
 
     def create_or_update_properties_of_entities(
         self,
-        list_of_ids: list,
-        list_of_property_kinds: list,
-        list_of_property_values: list,
+        list_of_ids: List[str],
+        list_of_property_kinds: List[str],
+        list_of_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
         """Updates and Adds properties of entities for batch operations.
@@ -264,9 +351,17 @@ class KnowledgeGraph:
             )
             return None
 
-        if change_date is None:
-            change_date = datetime.datetime.now()
-        updates = dict(zip(list_of_property_kinds, list_of_property_values))
+        entities = self.get_entities_by_id(list_of_ids)
+        if entities:
+            for [entity] in entities:
+                kinds_frozenset = entity.labels
+                entity_kind = next(iter(kinds_frozenset))
+                if not self.ontology.are_valid_entity_kind_properties(
+                    list_of_property_kinds,
+                    list_of_property_values,
+                    entity_kind,
+                ):
+                    return None
 
         for id_ in list_of_ids:
             entity = self.get_entity_by_id(id_)
@@ -275,11 +370,9 @@ class KnowledgeGraph:
                     "Node with Id %s is not in database\nNothing has been updated", id_
                 )
                 return None
-            else:
-                kinds_frozenset = entity.labels
-            kind = next(iter(kinds_frozenset))
-            if not self.ontology.are_valid_entity_kind_properties(list_of_property_kinds, kind):
-                return None
+        if change_date is None:
+            change_date = datetime.datetime.now()
+        updates = dict(zip(list_of_property_kinds, list_of_property_values))
 
         match_a, _ = querymaker.match_node_query("a")
         where_a = querymaker.where_property_value_in_list_query("a", "Id", list_of_ids)
@@ -303,8 +396,8 @@ class KnowledgeGraph:
     def create_or_update_properties_of_entity(
         self,
         id_: str,
-        list_of_property_kinds: list,
-        list_of_property_values: list,
+        list_of_property_kinds: List[str],
+        list_of_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
         """Updates and Adds entity properties.
@@ -351,7 +444,7 @@ class KnowledgeGraph:
     def remove_properties_from_entity(
         self,
         id_: str,
-        property_kinds: list,
+        property_kinds: List[str],
         change_date: Optional[datetime.datetime] = None,
     ) -> Optional[neo4j_graph.Node]:
         """Removes a property from a given entity.
@@ -373,15 +466,14 @@ class KnowledgeGraph:
         if change_date is None:
             change_date = datetime.datetime.now()
 
-
         self.create_new_state(id_, change_date)
         new_current_state = self.get_current_state(id_)
         if new_current_state is None:
             return None
 
         match_state, id_updated = querymaker.match_node_query("state", "State")
-        where_state = querymaker.where_node_internal_id_equal_to(
-            "state", new_current_state.id
+        where_state = querymaker.where_internal_id_equal_to(
+            ["state"], [new_current_state.id]
         )
         remove_state = querymaker.remove_properties_query("state", property_kinds)
         return_state = querymaker.return_nodes_or_relationships_query(["state"])
@@ -442,14 +534,17 @@ class KnowledgeGraph:
             logging.error("No such a node to be deleted")
             return None
 
-        return self.create_or_update_property_of_entity(id_, "_deleted", True, deletion_date)
+        return self.create_or_update_property_of_entity(
+            id_, "_deleted", True, deletion_date
+        )
 
     def create_relationship(
         self,
         id_a: str,
         relationship_kind: str,
-        rel_properties: dict,
         id_b: str,
+        rel_property_kinds: Optional[List[str]] = None,
+        rel_property_values: Optional[List[Any]] = None,
         create_date: Optional[datetime.datetime] = None,
     ) -> Optional[neo4j_graph.Relationship]:
         """Finds entities A and B and set a relationship between them.
@@ -459,43 +554,27 @@ class KnowledgeGraph:
         Args:
           id_a: id of entity A
           relationship_kind: relationship between entities A and B
-          rel_properties: relationship properties
           id_b: id of entity B
+          rel_property_kinds: Relationship properties
+          rel_property_values: Relationship property values
           create_date: relationship creation date
 
         Returns:
             neo4j relationship object in case of success or None in case of error
 
         """
-        if (a_node := self.get_entity_by_id(id_a)) is not None:
-            kind_a = next(iter(a_node.labels))
-        else:
-            logging.error(
-                """Id '%s' is not defined self, in DB, relationship (%s,%s,%s) was not created""",
-                id_a,
-                id_a,
-                relationship_kind,
-                id_b,
-            )
-            return None
-        if (b_node := self.get_entity_by_id(id_b)) is not None:
-            kind_b = next(iter(b_node.labels))
-        else:
-            logging.error("Id '%s' is not defined self, in DB", id_b)
-            return None
-        if not self.ontology.is_valid_relationship(
-            kind_a, relationship_kind, kind_b, list(rel_properties.keys())
+        if rel_property_kinds is None:
+            rel_property_kinds = []
+        if rel_property_values is None:
+            rel_property_values = []
+
+        if not self._is_valid_relationship(
+            id_a, relationship_kind, id_b, rel_property_kinds, rel_property_values
         ):
-            relationship_model = (kind_a, relationship_kind, kind_b)
-            logging.error(
-                """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid relationship """
-                """in ontology data model""",
-                id_a,
-                relationship_kind,
-                id_b,
-                relationship_model,
-            )
             return None
+
+        rel_property_kinds.append("_deleted")
+        rel_property_values.append(False)
 
         if create_date is None:
             create_date = datetime.datetime.now()
@@ -505,6 +584,7 @@ class KnowledgeGraph:
         match_b, filter_b = querymaker.match_node_query(
             "b", properties_filter={"Id": id_b}
         )
+        rel_properties = dict(zip(rel_property_kinds, rel_property_values))
         rel, rel_properties = querymaker.create_relationship_query(
             "a", relationship_kind, rel_properties, "b", create_date
         )
@@ -526,7 +606,7 @@ class KnowledgeGraph:
 
     def search_relationships(
         self,
-        relationship_kind: str,
+        relationship_kind: Optional[str] = None,
         rel_properties_filter: Optional[dict] = None,
         id_a: str = "",
         id_b: str = "",
@@ -535,7 +615,9 @@ class KnowledgeGraph:
         limit=10,
         return_query_instead_of_relationships: bool = False,
         search_all_states=False,
-    ) -> Union[list, Tuple[str, dict]]:
+    ) -> Union[
+        List[List[Union[neo4j_graph.Node, neo4j_graph.Relationship]]], Tuple[str, dict]
+    ]:
         """Searches existing relationships.
 
         Args:
@@ -553,6 +635,8 @@ class KnowledgeGraph:
         """
         if rel_properties_filter is None:
             rel_properties_filter = {}
+        if relationship_kind is None:
+            relationship_kind = ""
 
         a_properties_filter = {}
         b_properties_filter = {}
@@ -597,39 +681,54 @@ class KnowledgeGraph:
     def update_relationship(
         self,
         relationship_kind: str,
-        updates: dict,
         id_a: str,
         id_b: str,
+        updated_property_kinds: List[str],
+        updated_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
         """Updates a relationship properties.
 
         Args:
           relationship_kind: relationship type
-          updates: new properties and updated properties
           id_a: id of entity A
           id_b: id of entity B
+          updated_property_kinds: Entity properties to be updated
+          updated_property_values: New entity property values
           change_date: the date of node updating
 
         Returns:
 
         """
-        # - It seems that it's not recommended to update relationship properties, as there is no
-        #   special function for doing that in the versioner.
-        # - Notice that you need to save the relationship's properties before deletion, in order to
-        #   use them in creating the new one.
-
         if change_date is None:
             change_date = datetime.datetime.now()
+        if updated_property_kinds is None:
+            updated_property_kinds = []
+        if updated_property_values is None:
+            updated_property_values = []
+
+        if not self._is_valid_relationship(
+            id_a,
+            relationship_kind,
+            id_b,
+            updated_property_kinds,
+            updated_property_values,
+        ):
+            return None
 
         self.create_new_state(id_a, change_date)
 
         # update relationship of the new state
-        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_a})
-        match_b, filter_b = querymaker.match_node_query("b", properties_filter={"Id":id_b})
+        match_a, filter_a = querymaker.match_node_query(
+            "a", properties_filter={"Id": id_a}
+        )
+        match_b, filter_b = querymaker.match_node_query(
+            "b", properties_filter={"Id": id_b}
+        )
         rel_match, filter_r = querymaker.match_relationship_versioner_query(
             "a", "r", relationship_kind, {}, "b", state_relationship_kind="CURRENT"
         )
+        updates = dict(zip(updated_property_kinds, updated_property_values))
         set_query, updated_updates = querymaker.set_property_query("r", updates)
 
         params = {**filter_a, **filter_b, **filter_r, **updated_updates}
@@ -668,7 +767,7 @@ class KnowledgeGraph:
             return_query_instead_of_relationships=True,
         )
         delete_query = querymaker.delete_relationship_cypher_query("r")
-        query = "\n".join([match_relationship, delete_query])
+        query = "\n".join([match_relationship, delete_query])  # type: ignore
 
         db.cypher_query(query, params)
 
@@ -748,7 +847,27 @@ class KnowledgeGraph:
             )
             return None
 
-    def create_new_state(self, id_: str, create_date: Optional[datetime.datetime] = None):
+    def get_previous_state(self, internal_state_id: int) -> Optional[neo4j_graph.Node]:
+        """Returns the State node connected with a give state by PREVIOUS relationship."""
+        match_a, _ = querymaker.match_node_query("s1", "State")
+        match_b, _ = querymaker.match_node_query("s2", "State")
+        where_query = querymaker.where_internal_id_equal_to(["s2"], [internal_state_id])
+        match_rel, _ = querymaker.match_relationship_cypher_query(
+            "s2", "r", "PREVIOUS", {}, var_name_b="s1"
+        )
+        return_query = querymaker.return_nodes_or_relationships_query(["s1"])
+
+        query = "\n".join([match_a, match_b, where_query, match_rel, return_query])
+        state, _ = db.cypher_query(query)
+        if state:
+            [[state]] = state
+            return state
+        else:
+            return None
+
+    def create_new_state(
+        self, id_: str, create_date: Optional[datetime.datetime] = None
+    ):
         """Creates a new State node for an entity with the exact same
         properties and relationships as the previous one
 
@@ -757,7 +876,11 @@ class KnowledgeGraph:
           create_date: New state creation date
 
         """
-        match_a, filter_a = querymaker.match_node_query("a", properties_filter={"Id":id_})
+        if create_date is None:
+            create_date = datetime.datetime.now()
+        match_a, filter_a = querymaker.match_node_query(
+            "a", properties_filter={"Id": id_}
+        )
         set_query, _ = querymaker.patch_property_query(
             "a", updates={}, change_date=create_date
         )
@@ -765,7 +888,7 @@ class KnowledgeGraph:
         query = "\n".join([match_a, set_query, return_query])
         db.cypher_query(query, filter_a)
 
-    def get_entities_states_by_date(self, list_of_ids: list, date_to_inspect: str):
+    def get_entities_states_by_date(self, list_of_ids: List[str], date_to_inspect: str):
         """Returns the active state nodes on a given date for many entities.
 
         Args:
@@ -817,3 +940,107 @@ class KnowledgeGraph:
         else:
             logging.error("No state node")
             return None
+
+    def get_two_states_difference(
+        self, first_state_internal_id: int, second_state_internal_id: int
+    ) -> Tuple[List[str], List[str]]:
+        """Returns the difference between two states of one entity of the form:
+        (Differences in properties, differences in relationships).
+        """
+        match_a, _ = querymaker.match_node_query("first_state", kind="State")
+        match_b, _ = querymaker.match_node_query("second_state", kind="State")
+        where_query = querymaker.where_internal_id_equal_to(
+            ["first_state", "second_state"],
+            [first_state_internal_id, second_state_internal_id],
+        )
+        diff_query = querymaker.get_property_differences_query(
+            "first_state", "second_state"
+        )
+        return_query = querymaker.return_nodes_or_relationships_query(
+            ["operation", "label", "oldValue", "newValue"]
+        )
+        query = "\n".join([match_a, match_b, where_query, diff_query, return_query])  # type: ignore
+        differences_in_properties, _ = db.cypher_query(query)
+
+        # get relationships of first and second states
+        rels_of_states = {"first_state": [], "second_state": []}
+        for node in rels_of_states.copy():
+            match_r_node, _ = querymaker.match_node_query("r_node", "R")
+            match_rel, _ = querymaker.match_relationship_cypher_query(
+                node, "r", "", {}, "r_node"
+            )
+            return_query = querymaker.return_nodes_or_relationships_query(["r"])
+
+            query = "\n".join(
+                [match_a, match_b, match_r_node, where_query, match_rel, return_query]
+            )  # type: ignore
+            rels, _ = db.cypher_query(query)
+            if rels:
+                rels_of_states[node] = [rel[0] for rel in rels]
+
+        # compare relationships
+        differences_in_relationships = []
+        first_state_rels = {
+            (rel.type, rel.nodes[1].id): rel for rel in rels_of_states["first_state"]
+        }
+        second_state_rels = {
+            (rel.type, rel.nodes[1].id): rel for rel in rels_of_states["second_state"]
+        }
+        for relationship in rels_of_states["first_state"]:
+            if (
+                rel := (relationship.type, relationship.nodes[1].id)
+            ) in second_state_rels:
+                rel_from_props = dict(relationship.items())
+                rel_to_props = dict(second_state_rels[rel].items())
+
+                for prop in rel_from_props:
+                    if prop not in rel_to_props:
+                        differences_in_relationships.append(
+                            [
+                                "REMOVE property",
+                                relationship.type,
+                                prop,
+                                rel_from_props[prop],
+                                None,
+                            ]
+                        )
+                    else:
+                        if rel_from_props[prop] != rel_to_props[prop]:
+                            differences_in_relationships.append(
+                                [
+                                    "UPDATE property",
+                                    relationship.type,
+                                    prop,
+                                    rel_from_props[prop],
+                                    rel_to_props[prop],
+                                ]
+                            )
+                for prop in rel_to_props:
+                    if prop not in rel_from_props:
+                        differences_in_relationships.append(
+                            [
+                                "ADD property",
+                                relationship.type,
+                                prop,
+                                None,
+                                rel_to_props[prop],
+                            ]
+                        )
+            else:
+                r_node_id = relationship.nodes[1].id
+                second_entity_kind = next(
+                    iter(self._get_entity_by_r_node_id(r_node_id).labels)
+                )
+                differences_in_relationships.append(
+                    ["REMOVE", relationship.type, second_entity_kind]
+                )
+        for relationship in rels_of_states["second_state"]:
+            if (relationship.type, relationship.nodes[1].id) not in first_state_rels:
+                r_node_id = relationship.nodes[1].id
+                second_entity_kind = next(
+                    iter(self._get_entity_by_r_node_id(r_node_id).labels)
+                )
+                differences_in_relationships.append(
+                    ["ADD", relationship.type, second_entity_kind]
+                )
+        return differences_in_properties, differences_in_relationships

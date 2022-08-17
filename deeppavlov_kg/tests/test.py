@@ -24,7 +24,7 @@ TEST_USER_ENTITIES = [
         "Id":"2",
         "properties": {
             "name": "Sandy Bates",
-            "born": "1998-04-10",
+            "born": datetime.strptime("1998-04-10", "%Y-%m-%d"),
             "OCEAN_openness": True,
             "OCEAN_conscientiousness": False,
             "OCEAN_agreeableness": False,
@@ -109,12 +109,17 @@ def test_populate(drop=True):
 
     for kind, entities in TEST_ENTITIES.items():
         for entity_dict in entities:
+            types = [type(value) for value in entity_dict["properties"].values()]
             graph.ontology.create_entity_kind(
                 kind,
-                kind_properties=set(entity_dict["properties"].keys()),
+                kind_properties=list(entity_dict["properties"].keys()),
+                kind_property_types=types,
             )
             graph.create_entity(
-                kind, entity_dict["Id"], entity_dict["properties"]
+                kind,
+                entity_dict["Id"],
+                list(entity_dict["properties"].keys()),
+                list(entity_dict["properties"].values()),
             )
 
     for id_a, rel, rel_dict, id_b in TEST_MATCHES:
@@ -123,9 +128,14 @@ def test_populate(drop=True):
 
         b_node= graph.get_entity_by_id(id_b)
         kind_b = next(iter(b_node.labels))
-        
-        graph.ontology.create_relationship_model(kind_a, rel, kind_b, list(rel_dict.keys()))
-        graph.create_relationship(id_a, rel, rel_dict,id_b)
+
+        types = [type(value) for value in rel_dict.values()]
+        graph.ontology.create_relationship_kind(
+            rel, kind_a, kind_b, list(rel_dict.keys()), types
+        )
+        graph.create_relationship(
+            id_a, rel, id_b, list(rel_dict.keys()), list(rel_dict.values())
+        )
 
 
 def test_search():
@@ -203,7 +213,7 @@ def test_search():
 
 def test_update():
     # Update Jack's properties
-    graph.ontology.create_entity_kind_properties("User", ["height"])
+    graph.ontology.create_entity_kind_properties("User", ["height"], [int])
     jack_id = [
         jack[0].get("Id") for jack in graph.search_for_entities("User", {"name":"Jack Ryan"})
     ][0]
@@ -227,9 +237,13 @@ def test_update():
     theater_id = [
         user[0].get("Id") for user in graph.search_for_entities("Interest", {"name":"Theater"})
     ][0]
+    graph.ontology.create_relationship_kind_properties(
+        "User", "DISLIKES", "Interest", ["every"]
+    )
     graph.update_relationship(
         "DISLIKES",
-        updates={"every": "Friday"},
+        updated_property_kinds=["every"],
+        updated_property_values=["Friday"],
         id_a=jack_id,
         id_b=theater_id,
     )
@@ -247,7 +261,7 @@ def test_update():
     ][0]
     graph.remove_relationship("STUDY", jack_id, uni_id)
     graph.remove_relationship("KEEPS_UP", jack_id, dancing_id)
-    graph.create_relationship(jack_id, "KEEPS_UP", {}, yoga_id)
+    graph.create_relationship(jack_id, "KEEPS_UP", yoga_id)
 
 
 def test_delete():

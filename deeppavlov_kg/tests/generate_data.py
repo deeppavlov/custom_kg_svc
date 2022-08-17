@@ -173,9 +173,10 @@ def iterate_generate_1node_and_1rel(
         rel = rel[0]
         rel["end"]["Id"] = node["Id"]
         rel["properties"].update({"Id": rel["Id"], "_creation_timestamp": _date})
+        rel_types = [type(value) for value in rel["properties"].values()]
         relationships.append(rel)
         node_kind=node["labels"][0]
-
+        node_types = [type(value) for value in node["properties"].values()]
         node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
         while node_parent_kind == node_kind:
             node_parent_kind = next(iter(rand.get_random_item(NODE_LABELS)))
@@ -184,31 +185,36 @@ def iterate_generate_1node_and_1rel(
             graph.ontology.create_entity_kind(
                 node_kind,
                 parent=node_parent_kind,
-                kind_properties=set(node["properties"].keys())
+                kind_properties=list(node["properties"].keys()),
+                kind_property_types=node_types,
             )
         else:
             graph.ontology.create_entity_kind_properties(
                 node_kind,
-                set(node["properties"].keys())                
+                list(node["properties"].keys()),
+                new_property_types=node_types,
             )
         graph.create_entity(
             kind=node_kind,
             id_=node["properties"].pop("Id"),
-            state_properties=node["properties"],
+            property_kinds=list(node["properties"].keys()),
+            property_values=list(node["properties"].values()),
             create_date=node["properties"]["_creation_timestamp"],
         )
 
-        graph.ontology.create_relationship_model(
-            next(iter(graph.get_entity_by_id(rel["start"]["Id"]).labels)),
+        graph.ontology.create_relationship_kind(
             rel["label"],
+            next(iter(graph.get_entity_by_id(rel["start"]["Id"]).labels)),
             node_kind,
-            rel_properties=list(rel["properties"].keys())
+            rel_property_kinds=list(rel["properties"].keys()),
+            rel_property_types=rel_types,
         )
         graph.create_relationship(
             id_a=rel["start"]["Id"],
             relationship_kind=rel["label"],
-            rel_properties=rel["properties"],
             id_b=rel["end"]["Id"],
+            rel_property_kinds=list(rel["properties"].keys()),
+            rel_property_values=list(rel["properties"].values()),
             create_date=rel["properties"]["_creation_timestamp"],
         )
         yield nodes, relationships
@@ -258,7 +264,7 @@ def fake_update(
                 kind = next(iter(kinds_frozenset))
                 graph.ontology.create_entity_kind_properties(
                     kind,
-                    new_properties=list(properties_dict.keys())
+                    new_property_kinds=list(properties_dict.keys())
                 )
 
                 graph.ontology.create_entity_kind_properties(
@@ -274,18 +280,21 @@ def fake_update(
             else:
                 rel = rand.get_random_item(relationships)
                 new_property = relationship_properties.create(iterations=1)[0]
+                rel_types = [type(value) for value in new_property.values()]
                 graph.ontology.create_relationship_kind_properties(
                     next(iter(graph.get_entity_by_id(rel["start"]["Id"]).labels)),
                     rel["label"],
                     next(iter(graph.get_entity_by_id(rel["end"]["Id"]).labels)),
-                    new_properties=[new_property],
+                    new_property_kinds=list(new_property.keys()),
+                    new_property_types=rel_types,
                 )
                 graph.update_relationship(
                     relationship_kind=rel["label"],
-                    updates=new_property,
-                    change_date=_date,
                     id_a=rel["start"]["Id"],
                     id_b=rel["end"]["Id"],
+                    updated_property_kinds=list(new_property.keys()),
+                    updated_property_values=list(new_property.values()),
+                    change_date=_date,
                 )
         elif operation == "generate":
             nodes, relationships = next(generator)
@@ -333,12 +342,13 @@ def generate_specific_amount_of_data(
         graph.ontology.create_entity_kind(
             node_kind,
             parent=node_parent_kind,
-            kind_properties=set(node["properties"].keys())
+            kind_properties=list(node["properties"].keys())
         )
         graph.create_entity(
             kind=node_kind,
             id_=node["properties"].pop("Id"),
-            state_properties=node["properties"],
+            property_kinds=list(node["properties"].keys()),
+            property_values=list(node["properties"].values()),
             create_date=node["properties"]["_creation_timestamp"],
         )
     for rel in relationships:
@@ -347,7 +357,8 @@ def generate_specific_amount_of_data(
         graph.create_relationship(
             id_a=rel["start"]["Id"],
             relationship_kind=rel["label"],
-            rel_properties=rel["properties"],
+            rel_property_kinds=list(rel["properties"].keys()),
+            rel_property_values=list(rel["properties"].values()),
             id_b=rel["end"]["Id"],
             create_date=rel["properties"]["_creation_timestamp"],
         )
