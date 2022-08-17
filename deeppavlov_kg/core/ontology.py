@@ -2,7 +2,7 @@ import datetime
 import json
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Set, Type, Optional, Union
+from typing import Any, Dict, List, Type, Optional, Union
 import logging
 
 import treelib
@@ -93,7 +93,7 @@ class Ontology:
         kind: str,
         parent: str = "Kind",
         start_tree: Optional[Tree] = None,
-        kind_properties: Optional[Set[str]] = None,
+        kind_properties: Optional[List[str]] = None,
         kind_property_types: Optional[List[Type]] = None,
         kind_property_measurement_units: Optional[List[str]] = None,
     ) -> Tree:
@@ -114,7 +114,7 @@ class Ontology:
 
         """
         if kind_properties is None:
-            kind_properties = set()
+            kind_properties = []
         if kind_property_types is None:
             kind_property_types = [str] * (len(kind_properties))
         if kind_property_measurement_units is None:
@@ -515,12 +515,12 @@ class Ontology:
             logging.error("Data model is empty. Couldn't find relationships")
             return None
         if relationship_kind in data_model:
-            for idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
+            for model_idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
                 if (kind_a, kind_b) == (knd_a, knd_b):
-                    for prop in new_property_kinds:
-                        data_model[relationship_kind][idx][2][prop] = {
-                            "type": self._type2str(new_property_types)[idx],
-                            "measurement_unit": new_property_measurement_units[idx],
+                    for prop_idx, prop in enumerate(new_property_kinds):
+                        data_model[relationship_kind][model_idx][2][prop] = {
+                            "type": self._type2str(new_property_types)[prop_idx],
+                            "measurement_unit": new_property_measurement_units[prop_idx],
                         }
             self._save_ontology_data_model(data_model)
         else:
@@ -573,6 +573,8 @@ class Ontology:
                 "Relationship kind '%s' is not in data model", relationship_kind
             )
             return False
+
+        valid = True
         for (knd_a, knd_b, _) in data_model[relationship_kind]:
             if (
                 (knd_a == kind_a and knd_b == kind_b)
@@ -580,15 +582,19 @@ class Ontology:
                 or (knd_a == kind_a and knd_b == "All")
                 or (knd_a == "All" and knd_b == "All")
             ):
-                continue
+                valid = True
+                break
             else:
-                logging.error(
+                logging.warning(
                     "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
                     relationship_kind,
                     kind_a,
                     kind_b,
                 )
-                return False
+                valid=False
+                continue
+        if not valid:
+            return False
 
         for (model_a, model_b, model_properties) in data_model[relationship_kind]:
             if (kind_a, kind_b) == (model_a, model_b):
