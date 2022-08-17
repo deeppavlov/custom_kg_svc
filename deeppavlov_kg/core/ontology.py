@@ -119,10 +119,12 @@ class Ontology:
             kind_property_types = [str] * (len(kind_properties))
         if kind_property_measurement_units is None:
             kind_property_measurement_units = [""] * (len(kind_properties))
-        
+
         if len(kind_property_types) != len(kind_property_measurement_units):
-            logging.error("Number of property types doesn't correspond properly with number of"
-                          " property measurement_units. They should be equal")
+            logging.error(
+                "Number of property types doesn't correspond properly with number of"
+                " property measurement_units. They should be equal"
+            )
 
         kind = kind.capitalize()
         parent = parent.capitalize()
@@ -134,9 +136,11 @@ class Ontology:
                 start_tree.create_node(
                     tag="Kind",
                     identifier="Kind",
-                    data=Kind({
-                        "_deleted": {"type": str(bool), "measurement_unit": ""},
-                    }),
+                    data=Kind(
+                        {
+                            "_deleted": {"type": str(bool), "measurement_unit": ""},
+                        }
+                    ),
                 )
         tree = start_tree
 
@@ -176,7 +180,7 @@ class Ontology:
     def remove_entity_kind(self, kind: str):
         """Removes kind from database/ontology_kinds_hierarchy"""
         tree = self._load_ontology_kinds_hierarchy()
-        if self._get_node_from_tree(tree, kind) is None:
+        if tree is None or self._get_node_from_tree(tree, kind) is None:
             return None
 
         tree.remove_node(kind)
@@ -239,9 +243,7 @@ class Ontology:
                 prop_details = kind_node.data.properties[prop]
                 del kind_node.data.properties[prop]
                 prop_details["type"] = self._type2str(new_property_types)[idx]
-                prop_details["measurement_unit"] = new_property_measurement_units[
-                    idx
-                ]
+                prop_details["measurement_unit"] = new_property_measurement_units[idx]
                 properties_kinds = (
                     old_property_kinds
                     if new_property_kinds is None
@@ -434,9 +436,11 @@ class Ontology:
                     },
                 }
             )
-        rel_properties_dict.update({
-            "_deleted": {"type": str(bool), "measurement_unit": ""},
-        })
+        rel_properties_dict.update(
+            {
+                "_deleted": {"type": str(bool), "measurement_unit": ""},
+            }
+        )
 
         data_model = self._load_ontology_data_model()
         if data_model is None:
@@ -523,8 +527,10 @@ class Ontology:
             logging.error(
                 "Relationship_kind '%s' is not in data model", relationship_kind
             )
-        return data_model
+        return data_model[relationship_kind]
 
+    def update_relationship_kind_properties(self):
+        raise NotImplementedError()
 
     def get_relationship_kind_details(
         self, relationship_kind: str
