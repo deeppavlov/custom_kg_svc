@@ -836,8 +836,11 @@ class KnowledgeGraph:
         query = "\n".join([match_query, get_query, return_query])
         try:
             node, _ = db.cypher_query(query, params)
-            [[node]] = node
-            return node
+            if node:
+                [[node]] = node
+                return node
+            else:
+                return None
         except ClientError as exc:
             logging.error(
                 """The given entity has no current state node. Either the entity is no longer active,
