@@ -21,7 +21,7 @@ TEST_USER_ENTITIES = [
         },
     },
     {
-        "Id":"2",
+        "Id": "2",
         "properties": {
             "name": "Sandy Bates",
             "born": datetime.strptime("1998-04-10", "%Y-%m-%d"),
@@ -38,9 +38,7 @@ TEST_BOT_ENTITIES = [
     {"Id": "3", "properties": {"name": "ChatBot", "born": "2020-03-02"}}
 ]
 
-TEST_UNIVERSITY_ENTITIES = [
-    {"Id": "3a5", "properties": {"name": "Oxford"}}
-]
+TEST_UNIVERSITY_ENTITIES = [{"Id": "3a5", "properties": {"name": "Oxford"}}]
 
 TEST_INTEREST_ENTITIES = [
     {"Id": "4", "properties": {"name": "Theater"}},
@@ -95,15 +93,7 @@ TEST_MATCHES = [
 ]
 
 
-graph = KnowledgeGraph(
-    "bolt://neo4j:neo4j@localhost:7687",
-    ontology_kinds_hierarchy_path="deeppavlov_kg/database/ontology_kinds_hierarchy.pickle",
-    ontology_data_model_path="deeppavlov_kg/database/ontology_data_model.json",
-    db_ids_file_path="deeppavlov_kg/database/db_ids.txt"
-)
-
-
-def test_populate(drop=True):
+def populate(graph: KnowledgeGraph, drop=True):
     if drop:
         graph.drop_database()
 
@@ -126,7 +116,7 @@ def test_populate(drop=True):
         a_node = graph.get_entity_by_id(id_a)
         kind_a = next(iter(a_node.labels))
 
-        b_node= graph.get_entity_by_id(id_b)
+        b_node = graph.get_entity_by_id(id_b)
         kind_b = next(iter(b_node.labels))
 
         types = [type(value) for value in rel_dict.values()]
@@ -138,7 +128,7 @@ def test_populate(drop=True):
         )
 
 
-def test_search():
+def search(graph: KnowledgeGraph):
     print("Search nodes:")
     habits = graph.search_for_entities("Habit")
     bad_habits = graph.search_for_entities("Habit", {"label": "Bad"})
@@ -148,22 +138,21 @@ def test_search():
             print(graph.get_current_state(habit[0].get("Id")).get("name"))
 
     print("Search relationships:")
-    habits = graph.search_relationships("KEEPS_UP", search_all_states=True) # relationships of all time
+    habits = graph.search_relationships(
+        "KEEPS_UP", search_all_states=True
+    )  # relationships of all time
     habits_since_march = graph.search_relationships("KEEPS_UP", {"since": "March"})
 
     # get sandy's habits
     sandy_id = [
-        sandy[0].get("Id") for sandy in graph.search_for_entities("User", {"name":"Sandy Bates"})
+        sandy[0].get("Id")
+        for sandy in graph.search_for_entities("User", {"name": "Sandy Bates"})
     ][0]
-    sandy_habits = graph.search_relationships(
-        "KEEPS_UP", id_a=sandy_id
-    )
+    sandy_habits = graph.search_relationships("KEEPS_UP", id_a=sandy_id)
 
     # get sandy's bad habits
     sandy_bad_habits = []
-    bad_habits_ids = [
-        habit[0].get("Id") for habit in bad_habits
-    ]
+    bad_habits_ids = [habit[0].get("Id") for habit in bad_habits]
     for habit in sandy_habits:
         if habit[TO_NODE_ORDER_IN_RELATIONSHIP_RESULT].get("Id") in bad_habits_ids:
             sandy_bad_habits.append(habit)
@@ -192,12 +181,14 @@ def test_search():
 
     # complex query
     print("\nWhat were Jack's habits when he was at university?")
-    study_rels = graph.search_relationships("STUDY", id_a="1", id_b="3a5", search_all_states=True)
+    study_rels = graph.search_relationships(
+        "STUDY", id_a="1", id_b="3a5", search_all_states=True
+    )
     state_ids_when_he_was_at_university = set()
     for rel in study_rels:
         state_id = rel[STATE_NODE_ORDER_IN_RELATIONSHIP_RESULT].id
         state_ids_when_he_was_at_university.add(state_id)
-    habits=[]
+    habits = []
     keeps_up_rels = graph.search_relationships(
         "KEEPS_UP", id_a="1", kind_b="Habit", search_all_states=True
     )
@@ -211,23 +202,22 @@ def test_search():
         print(graph.get_current_state(habit.get("Id")).get("name"))
 
 
-def test_update():
+def update(graph: KnowledgeGraph):
     # Update Jack's properties
     graph.ontology.create_entity_kind_properties("User", ["height"], [int])
     jack_id = [
-        jack[0].get("Id") for jack in graph.search_for_entities("User", {"name":"Jack Ryan"})
+        jack[0].get("Id")
+        for jack in graph.search_for_entities("User", {"name": "Jack Ryan"})
     ][0]
     graph.create_or_update_property_of_entity(
         id_=jack_id,
         property_kind="height",
-        property_value= 175,
+        property_value=175,
     )
 
     # Update all users properties
     graph.ontology.create_entity_kind_properties("User", ["country"])
-    users_ids = [
-        user[0].get("Id") for user in graph.search_for_entities("User")
-    ]
+    users_ids = [user[0].get("Id") for user in graph.search_for_entities("User")]
     graph.create_or_update_properties_of_entities(
         list_of_ids=users_ids,
         list_of_property_kinds=["country"],
@@ -235,7 +225,8 @@ def test_update():
     )
 
     theater_id = [
-        user[0].get("Id") for user in graph.search_for_entities("Interest", {"name":"Theater"})
+        user[0].get("Id")
+        for user in graph.search_for_entities("Interest", {"name": "Theater"})
     ][0]
     graph.ontology.create_relationship_kind_properties(
         "User", "DISLIKES", "Interest", ["every"]
@@ -249,27 +240,30 @@ def test_update():
     )
 
     uni_id = [
-        entity[0].get("Id") for entity in graph.search_for_entities(
-            "University", {"name": "Oxford"}
-        )
+        entity[0].get("Id")
+        for entity in graph.search_for_entities("University", {"name": "Oxford"})
     ][0]
     dancing_id = [
-        entity[0].get("Id") for entity in graph.search_for_entities("Habit", {"name": "Dancing"})
+        entity[0].get("Id")
+        for entity in graph.search_for_entities("Habit", {"name": "Dancing"})
     ][0]
     yoga_id = [
-        entity[0].get("Id") for entity in graph.search_for_entities("Habit", {"name": "Yoga"})
+        entity[0].get("Id")
+        for entity in graph.search_for_entities("Habit", {"name": "Yoga"})
     ][0]
     graph.remove_relationship("STUDY", jack_id, uni_id)
     graph.remove_relationship("KEEPS_UP", jack_id, dancing_id)
     graph.create_relationship(jack_id, "KEEPS_UP", yoga_id)
 
 
-def test_delete():
+def delete(graph: KnowledgeGraph):
     smoking_id = [
-        item[0].get("Id") for item in graph.search_for_entities("Habit", {"name":"Smoking"})
+        item[0].get("Id")
+        for item in graph.search_for_entities("Habit", {"name": "Smoking"})
     ][0]
     sandy_id = [
-        sandy[0].get("Id") for sandy in graph.search_for_entities("User", {"name":"Sandy Bates"})
+        sandy[0].get("Id")
+        for sandy in graph.search_for_entities("User", {"name": "Sandy Bates"})
     ][0]
     graph.remove_relationship(
         "KEEPS_UP",
@@ -279,7 +273,22 @@ def test_delete():
     graph.remove_entity(smoking_id)
 
 
-test_populate()
-test_update()
-test_search()
-test_delete()
+def run_all(graph: KnowledgeGraph, drop_when_populating: bool = False):
+    populate(graph, drop_when_populating)
+    update(graph)
+    search(graph)
+    delete(graph)
+
+
+if __name__ == "__main__":
+    kg = KnowledgeGraph(
+        "bolt://neo4j:neo4j@localhost:7687",
+        ontology_kinds_hierarchy_path="deeppavlov_kg/database/ontology_kinds_hierarchy.pickle",
+        ontology_data_model_path="deeppavlov_kg/database/ontology_data_model.json",
+        db_ids_file_path="deeppavlov_kg/database/db_ids.txt",
+    )
+
+    populate(kg, drop=True)
+    update(kg)
+    search(kg)
+    delete(kg)

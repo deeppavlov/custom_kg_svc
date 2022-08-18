@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
-from deeppavlov_kg.tests.generate_data import (
+from deeppavlov_kg.mocks.generate_data import (
     graph,
     fake_update,
     generic,
