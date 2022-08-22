@@ -126,9 +126,6 @@ class Ontology:
                 " property measurement_units. They should be equal"
             )
 
-        kind = kind.capitalize()
-        parent = parent.capitalize()
-
         if start_tree is None:
             start_tree = self._load_ontology_kinds_hierarchy()
             if start_tree is None:

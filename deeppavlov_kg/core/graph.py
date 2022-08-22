@@ -946,9 +946,13 @@ class KnowledgeGraph:
 
     def get_two_states_difference(
         self, first_state_internal_id: int, second_state_internal_id: int
-    ) -> Tuple[List[str], List[str]]:
+    ) -> Tuple[List[str], List[str], List[str]]:
         """Returns the difference between two states of one entity of the form:
-        (Differences in properties, differences in relationships).
+        (
+            Differences in entity properties,
+            differences in relationships,
+            differences in relationship properties,
+        ).
         """
         match_a, _ = querymaker.match_node_query("first_state", kind="State")
         match_b, _ = querymaker.match_node_query("second_state", kind="State")
@@ -962,8 +966,8 @@ class KnowledgeGraph:
         return_query = querymaker.return_nodes_or_relationships_query(
             ["operation", "label", "oldValue", "newValue"]
         )
-        query = "\n".join([match_a, match_b, where_query, diff_query, return_query])  # type: ignore
-        differences_in_properties, _ = db.cypher_query(query)
+        query = "\n".join([match_a, match_b, where_query, diff_query, return_query])
+        differences_in_entity_properties, _ = db.cypher_query(query)
 
         # get relationships of first and second states
         rels_of_states = {"first_state": [], "second_state": []}
@@ -976,12 +980,13 @@ class KnowledgeGraph:
 
             query = "\n".join(
                 [match_a, match_b, match_r_node, where_query, match_rel, return_query]
-            )  # type: ignore
+            )
             rels, _ = db.cypher_query(query)
             if rels:
                 rels_of_states[node] = [rel[0] for rel in rels]
 
         # compare relationships
+        differences_in_relationship_properties = []
         differences_in_relationships = []
         first_state_rels = {
             (rel.type, rel.nodes[1].id): rel for rel in rels_of_states["first_state"]
@@ -998,7 +1003,7 @@ class KnowledgeGraph:
 
                 for prop in rel_from_props:
                     if prop not in rel_to_props:
-                        differences_in_relationships.append(
+                        differences_in_relationship_properties.append(
                             [
                                 "REMOVE property",
                                 relationship.type,
@@ -1009,7 +1014,7 @@ class KnowledgeGraph:
                         )
                     else:
                         if rel_from_props[prop] != rel_to_props[prop]:
-                            differences_in_relationships.append(
+                            differences_in_relationship_properties.append(
                                 [
                                     "UPDATE property",
                                     relationship.type,
@@ -1020,7 +1025,7 @@ class KnowledgeGraph:
                             )
                 for prop in rel_to_props:
                     if prop not in rel_from_props:
-                        differences_in_relationships.append(
+                        differences_in_relationship_properties.append(
                             [
                                 "ADD property",
                                 relationship.type,
@@ -1046,4 +1051,53 @@ class KnowledgeGraph:
                 differences_in_relationships.append(
                     ["ADD", relationship.type, second_entity_kind]
                 )
-        return differences_in_properties, differences_in_relationships
+        return (
+            differences_in_entity_properties,
+            differences_in_relationships,
+            differences_in_relationship_properties
+        )
+
+    def get_all_path(self, id_: str) -> Optional[neo4j_graph.Path]:
+        """Retrieves all Entity's history in form of path, including the Entity node,
+        all the State nodes, CURRENT and PREVIOUS relationships.
+
+        Args:
+          id_: Entity id to be inspected
+
+        Returns:
+          path object
+
+        """
+        match, properties_filter = querymaker.match_node_query("a", properties_filter={"Id":id_})
+        with_ = querymaker.with_query(["a"])
+        get = querymaker.get_all_path_query("a")
+
+        query = "\n".join([match, with_, get])
+        path, _ = db.cypher_query(query, properties_filter)
+        if path:
+            return path[0][0]
+        else:
+            logging.warning("There is no known path for the requested node")
+            return None
+
+    def get_semantic_action_history(self, id_:str) -> Optional[list]:
+        """Retrieves semantic action changes that happened to a node from its creation moment.
+
+        Args:
+          id_: Entity id to be inspected
+
+        Returns:
+          List of semantic action changes.
+          None in case of error
+
+        """
+        path = self.get_all_path(id_)
+        if not path:
+            logging.error("There is no known semantic action history for the requested node")
+            return None
+        nodes_by_ascending_date = tuple(reversed(path.nodes))
+
+        semantic_actions = []
+        for node in nodes_by_ascending_date:
+            semantic_actions.append(node.get("SemanticActionDescription"))
+        return semantic_actions

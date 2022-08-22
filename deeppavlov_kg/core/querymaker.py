@@ -596,3 +596,20 @@ def get_property_differences_query(state_from: str, state_to: str) -> str:
         YIELD operation, label, oldValue, newValue
     """
     return query
+
+
+def get_all_path_query(var_name: str) -> str:
+    """Prepares and sanitizes versioner's get_all query.
+
+    Should be used together with match_query.
+
+    Args:
+      var_name: variable name which CYPHER will use to identify the match
+
+    Returns:
+      query string
+
+    """
+    var_name = sanitize_alphanumeric(var_name)
+    query = f"""CALL graph.versioner.get.all({var_name}) YIELD path RETURN path"""
+    return query
