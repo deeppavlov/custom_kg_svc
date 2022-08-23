@@ -46,4 +46,6 @@ mocks.populate(graph, drop=True)
 mocks.search(graph)
 mocks.update(graph)
 mocks.delete(graph)
+mocks.populate_from_aof_file(graph, "my_path/file.aof")
+mocks.connect_to_zet(graph, my_project_port)
 ```

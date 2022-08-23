@@ -1,5 +1,7 @@
 from datetime import datetime
+import logging
 from deeppavlov_kg import KnowledgeGraph
+from deeppavlov_kg.connector import connect_to_zu
 
 FROM_NODE_ORDER_IN_RELATIONSHIP_RESULT = 0
 HAS_STATE_RELATIONSHIP_ORDER_IN_RELATIONSHIP_RESULT = 1
@@ -271,6 +273,15 @@ def delete(graph: KnowledgeGraph):
         id_b=smoking_id,
     )
     graph.remove_entity(smoking_id)
+
+
+def populate_from_aof_file(graph: KnowledgeGraph, aof_file_path: str):
+    connect_to_zu.generate_from_aof(graph, aof_file_path)
+
+
+def connect_to_zet(graph: KnowledgeGraph, redis_project_port: str):
+    logging.basicConfig(level=logging.INFO)
+    connect_to_zu.connect_to_redis(graph, int(redis_project_port))
 
 
 def run_all(graph: KnowledgeGraph, drop_when_populating: bool = False):

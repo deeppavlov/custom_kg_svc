@@ -12,19 +12,13 @@ from deeppavlov_kg.connector.read_external_data import read_aof, read_all_redis_
 from deeppavlov_kg.connector.semantic_action_kinds import get_semantic_action_desc
 from deeppavlov_kg.core import querymaker
 
-WAITING_TIME_TO_REPEAT_PORT_CHECKING = 1
+WAITING_TIME_TO_REPEAT_PORT_CHECKING = 5
 UNLIMITED = 10**10
 
 DELETED_THIS_ITEM = 72
 MOVE_IN_SPACE = 74
 UNWANTED_SEMANTIC_ACTIONS = [MOVE_IN_SPACE, DELETED_THIS_ITEM]
 
-graph = KnowledgeGraph(
-    "bolt://neo4j:neo4j@localhost:7687",
-    ontology_kinds_hierarchy_path="deeppavlov_kg/database/ontology_kinds_hierarchy.pickle",
-    ontology_data_model_path="deeppavlov_kg/database/ontology_data_model.json",
-    db_ids_file_path="deeppavlov_kg/database/db_ids.txt"
-)
 
 def deflate_dicts(dict_: dict) -> dict:
     """Converts dictionaries inside a dictionary to keys-values in the outer dictionary.
@@ -99,7 +93,7 @@ def neo4j2datetime(date_: neo4j.time.DateTime):  # type: ignore
     return date_
 
 
-def check_updates_novelty(kind: str, properties_filter: dict, updates: dict) -> bool:
+def check_updates_novelty(graph: KnowledgeGraph, kind: str, properties_filter: dict, updates: dict) -> bool:
     """Checks the current state of a node and compare it with the updates.
 
     Args:
@@ -140,7 +134,7 @@ def ignore_semantic_actions(unwanted_semantic_actions: list, nodes: list) -> lis
     return clean_nodes
 
 
-def insert_into_kg(nodes: list):
+def insert_into_kg(graph: KnowledgeGraph, nodes: list):
     """Writes nodes and relationships to neo4j database.
 
     Args:
@@ -215,6 +209,7 @@ def insert_into_kg(nodes: list):
             added_ids.add(immutable["Id"])
         else:
             if check_updates_novelty(
+                graph,
                 kind=node_kind,
                 updates=mutable,
                 properties_filter=immutable,
@@ -229,7 +224,6 @@ def insert_into_kg(nodes: list):
     for node in nodes2:
         related = node.pop("Related")
         if related:
-            print(len(related))
             for relationship_dict in related:
                 relationship_dict.pop("RelationshipEntityId")
                 relationship_type = relationship_dict.pop("Relation")
@@ -276,7 +270,7 @@ def insert_into_kg(nodes: list):
                     )
 
 
-def generate_from_aof(file_path: str):
+def generate_from_aof(graph: KnowledgeGraph, file_path: str):
     """Reads aof file and inserts its data to neo4j database.
 
     Args:
@@ -288,10 +282,10 @@ def generate_from_aof(file_path: str):
     graph.drop_database()
     nodes = read_aof(file_path)
     nodes = ignore_semantic_actions(UNWANTED_SEMANTIC_ACTIONS, nodes)
-    insert_into_kg(nodes)
+    insert_into_kg(graph, nodes)
 
 
-def connect_to_redis(port: int):
+def connect_to_redis(graph: KnowledgeGraph, port: int):
     """Connects to redis port, reads data from it, and inserts it in neo4j database along the
        way as long as the port is open.
 
@@ -323,7 +317,7 @@ def connect_to_redis(port: int):
         if redis_data:
             nodes = list(redis_data.values())
             nodes = ignore_semantic_actions(UNWANTED_SEMANTIC_ACTIONS, nodes)
-            insert_into_kg(nodes)
+            insert_into_kg(graph, nodes)
 
             titles = {node["Title"] for node in nodes}
             if titles:
