@@ -1,14 +1,5 @@
 import json
 
-def read_aof(file_name):
-    with open(file_name, encoding="utf-8") as file:
-        lines = file.readlines()
-    nodes =[]
-    for line in lines:
-        if line[0] == "{":
-            nodes.append(json.loads(line[:-1]))
-    return nodes
-
 
 def read_all_redis_keys(r_db):
     keys = [key.decode("utf-8") for key in r_db.keys()]

@@ -8,9 +8,8 @@ import neo4j
 import redis
 
 from deeppavlov_kg import KnowledgeGraph
-from deeppavlov_kg.connector.read_external_data import read_aof, read_all_redis_keys, read_redis_value
+from deeppavlov_kg.connector.read_external_data import read_all_redis_keys, read_redis_value
 from deeppavlov_kg.connector.semantic_action_kinds import get_semantic_action_desc
-from deeppavlov_kg.core import querymaker
 
 WAITING_TIME_TO_REPEAT_PORT_CHECKING = 5
 UNLIMITED = 10**10
@@ -269,21 +268,6 @@ def insert_into_kg(graph: KnowledgeGraph, nodes: list):
                     )
 
 
-def generate_from_aof(graph: KnowledgeGraph, file_path: str):
-    """Reads aof file and inserts its data to neo4j database.
-
-    Args:
-      file_path: The aof file path in system
-
-    Returns:
-
-    """
-    graph.drop_database()
-    nodes = read_aof(file_path)
-    nodes = ignore_semantic_actions(UNWANTED_SEMANTIC_ACTIONS, nodes)
-    insert_into_kg(graph, nodes)
-
-
 def connect_to_redis(graph: KnowledgeGraph, port: int):
     """Connects to redis port, reads data from it, and inserts it in neo4j database along the
        way as long as the port is open.
@@ -295,19 +279,9 @@ def connect_to_redis(graph: KnowledgeGraph, port: int):
 
     """
     r_db = redis.Redis(port=port)
-    old_keys = read_all_redis_keys(r_db)
+    current_keys = new_keys = read_all_redis_keys(r_db)
 
     for _ in range(200):
-        time.sleep(WAITING_TIME_TO_REPEAT_PORT_CHECKING)
-        logging.info("Reading data")
-        current_keys = read_all_redis_keys(r_db)
-
-        number_new_keys = len(current_keys) - len(old_keys)
-        if number_new_keys:
-            new_keys = current_keys[-number_new_keys:]
-        else:
-            new_keys = []
-
         redis_data = {}
         for key in new_keys:
             properties_dict = read_redis_value(key, r_db)
@@ -323,3 +297,13 @@ def connect_to_redis(graph: KnowledgeGraph, port: int):
                 logging.info("Changes about %s have been inserted in neo4j DB", titles)
 
         old_keys = current_keys
+
+        time.sleep(WAITING_TIME_TO_REPEAT_PORT_CHECKING)
+        logging.info("Reading data")
+        current_keys = read_all_redis_keys(r_db)
+
+        number_new_keys = len(current_keys) - len(old_keys)
+        if number_new_keys:
+            new_keys = current_keys[-number_new_keys:]
+        else:
+            new_keys = []
