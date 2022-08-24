@@ -12,7 +12,7 @@ def sanitize_alphanumeric(input_value: str):
     Returns:
 
     """
-    return "".join(char for char in input_value if char.isalnum() or char == "_")
+    return "".join(char for char in input_value if char.isalnum() or char == "_" or char == ".")
 
 
 def sanitize_dict_keys(input_value: dict):
@@ -116,7 +116,7 @@ def match_node_query(
 
     if kind:
         kind = sanitize_alphanumeric(kind)
-        specify_kind = f": {kind}"
+        specify_kind = f": `{kind}`"
 
     if properties_filter:
         param_placeholders = ", ".join(
@@ -204,7 +204,7 @@ def remove_properties_query(var_name: str, property_kinds: list) -> str:
        query string
     """
     var_name = sanitize_alphanumeric(var_name)
-    properties_kinds = [sanitize_alphanumeric(kind) for kind in property_kinds]
+    properties_kinds = ["".join(["`",sanitize_alphanumeric(kind),"`"]) for kind in property_kinds]
     query = f"REMOVE {var_name}.{f', {var_name}.'.join(properties_kinds)}"
     return query
 
@@ -304,7 +304,7 @@ def match_relationship_cypher_query(
     specify_kind = ""
     if relationship_kind:
         relationship_kind = sanitize_alphanumeric(relationship_kind)
-        specify_kind = f": {relationship_kind}"
+        specify_kind = f": `{relationship_kind}`"
     rel_properties_filter = sanitize_dict_keys(rel_properties_filter)
 
     param_placeholders = ", ".join(
@@ -515,7 +515,7 @@ def where_property_value_in_list_query(
     var_name = sanitize_alphanumeric(var_name)
     property_kind = sanitize_alphanumeric(property_kind)
     values = [sanitize_id(v) for v in values]
-    query = f"WHERE {var_name}.{property_kind} IN {values}"
+    query = f"WHERE {var_name}.`{property_kind}` IN {values}"
     return query
 
 

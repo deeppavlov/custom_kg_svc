@@ -185,11 +185,10 @@ def insert_into_kg(graph: KnowledgeGraph, nodes: list):
         mutable["SemanticActionDescription"] = get_semantic_action_desc(mutable["SemanticAction"])
 
         node_kind = mutable.pop("Kind")
-        node_kind = querymaker.sanitize_alphanumeric(node_kind)
         if node_kind in [
-            "ZetUniverseKindsTopic",
-            "ZetUniverseKindsUserIdentificator",
-            "ZetUniverseKindsViewsGraphView"
+            "ZetUniverse.Kinds.Topic",
+            "ZetUniverse.Kinds.UserIdentificator",
+            "ZetUniverse.Kinds.Views.GraphView"
         ]:
             continue
         if immutable["Id"] not in added_ids:
