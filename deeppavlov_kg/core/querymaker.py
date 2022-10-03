@@ -36,7 +36,7 @@ def sanitize_id(input_value: str):
     Returns:
 
     """
-    return "".join(char for char in input_value if char.isalnum() or char in ["_", "-"])
+    return "".join(char for char in input_value if char.isalnum() or char in ["_", "-", "/"])
 
 
 def verify_date_validity(date_: str):

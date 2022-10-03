@@ -25,42 +25,48 @@ class Kind:
 
 class OntologyConfig:
     def __init__(self,):
-        pass
+        raise NotImplementedError
 
     def create_entity_kind(self, entity_kind: str):
-        pass
+        raise NotImplementedError
 
     def delete_entity_kind(self, entity_kind: str):
-        pass
+        raise NotImplementedError
+
+    def get_all_entity_kinds(self):
+        raise NotImplementedError
+
+    def get_entity_kind(self, entity_kind: str):
+        raise NotImplementedError
 
     def create_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], property_types: Optional[List[Type]]= None):
-        pass
+        raise NotImplementedError
 
     def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
-        pass
+        raise NotImplementedError
 
     def delete_property_kinds(self, entity_kinds: List[str], property_kinds: List[str]):
-        pass
+        raise NotImplementedError
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
-        pass
+        raise NotImplementedError
 
     def create_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str], entity_kinds_b: List[str]):
-        pass
+        raise NotImplementedError
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
-        pass
+        raise NotImplementedError
 
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
-        pass
+        raise NotImplementedError
 
-    # bonus
-    def create_relationship_property_kind():
-        pass
+    # Extra
+    def create_relationship_property_kind(self):
+        raise NotImplementedError
 
-    # bonus
-    def update_relationship_property_kind():
-        pass
+    # Extra
+    def update_relationship_property_kind(self):
+        raise NotImplementedError
 
 
 class Neo4jOntologyConfig(OntologyConfig):
@@ -130,6 +136,109 @@ class Neo4jOntologyConfig(OntologyConfig):
             logging.error("Kind '%s' is not in ontology graph", kind)
             return None
         return kind_node
+
+    def _are_valid_entity_kind_properties(
+        self,
+        list_of_property_kinds: List[str],
+        list_of_property_values: List[Any],
+        entity_kind: str,
+    ):
+        """Checks if all the properties in the list are in fact properties of 'kind' in
+        the ontology graph.
+        """
+        kind_properties = self.get_entity_kind(entity_kind)
+        for idx, prop in enumerate(list_of_property_kinds):
+            if prop not in kind_properties:
+                logging.error(
+                    """The property '%s' isn't in '%s' properties in ontology graph.
+                    Use create_properties_of_kind() function to add it""",
+                    prop,
+                    entity_kind,
+                )
+                return False
+
+            property_type = kind_properties[prop]["type"]
+            if str(type(list_of_property_values[idx])) != property_type:
+                logging.error(
+                    "Property '%s' should be of type: '%s'", prop, property_type
+                )
+                return False
+        return True
+
+    def _is_valid_relationship_model(
+        self,
+        kind_a: str,
+        relationship_kind: str,
+        kind_b: str,
+        rel_property_kinds: List[str],
+        rel_property_values: List[Any],
+    ) -> bool:
+        """Checks if a relationship between two kinds is valid in the data model.
+
+        Args:
+          kind_a: kind of first entity (from)
+          relationship_kind: kind of relationship
+          kind_b: kind of second entity (to)
+          rel_properties: list of properties, a relationship could have
+
+        Returns:
+          False in case the relationship is invalid (not in data model)
+          True in case it is valid
+
+        """
+        data_model = self._load_ontology_data_model()
+        if data_model is None:
+            logging.error("The data model is empty")
+            return False
+        if relationship_kind not in data_model:
+            logging.error(
+                "Relationship kind '%s' is not in data model", relationship_kind
+            )
+            return False
+
+        valid = True
+        for (knd_a, knd_b, _) in data_model[relationship_kind]:
+            if (
+                (knd_a == kind_a and knd_b == kind_b)
+                or (knd_a == "All" and knd_b == kind_b)
+                or (knd_a == kind_a and knd_b == "All")
+                or (knd_a == "All" and knd_b == "All")
+            ):
+                valid = True
+                break
+            else:
+                logging.warning(
+                    "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
+                    relationship_kind,
+                    kind_a,
+                    kind_b,
+                )
+                valid=False
+                continue
+        if not valid:
+            return False
+
+        for (model_a, model_b, model_properties) in data_model[relationship_kind]:
+            if (kind_a, kind_b) == (model_a, model_b):
+                for idx, prop in enumerate(rel_property_kinds):
+                    if prop not in model_properties:
+                        logging.error(
+                            """The property '%s' isn't in '%s' properties in ontology data model.
+                            Use create_properties_of_relationship_kind() function to add it""",
+                            prop,
+                            relationship_kind,
+                        )
+                        return False
+                    else:
+                        property_type = model_properties[prop]["type"]
+                        if str(type(rel_property_values[idx])) != property_type:
+                            logging.error(
+                                "Property '%s' should be of type: '%s'",
+                                prop,
+                                property_type,
+                            )
+                            return False
+        return True
 
     def create_entity_kind(
         self,
@@ -232,6 +341,17 @@ class Neo4jOntologyConfig(OntologyConfig):
         logging.info(
             "Kind '%s' has been removed successfully from ontology graph", entity_kind
         )
+
+    def get_all_entity_kinds(self):
+        raise NotImplementedError
+
+    def get_entity_kind(self, entity_kind: str):
+        """Returns the kind properties, stored in ontology graph"""
+        tree = self._load_ontology_kinds_hierarchy()
+        kind_node = self._get_node_from_tree(tree, entity_kind)
+        if kind_node is not None:
+            return kind_node.data.properties
+        return dict()
 
     def create_property_kinds(
         self,
@@ -378,15 +498,68 @@ class Neo4jOntologyConfig(OntologyConfig):
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         raise NotImplementedError
 
-    # bonus
-    def create_relationship_property_kind(self):
+    # Extra
+    def create_relationship_property_kinds(
+        self,
+        kind_a: str,
+        relationship_kind: str,
+        kind_b: str,
+        new_property_kinds: List[str],
+        new_property_types: Optional[List[Type]] = None,
+        # new_property_measurement_units: Optional[List[str]] = None,
+    ):
+        """Creates a list of properties of a given kind
+
+        Args:
+          new_properties: list of properties, a relationship could have,
+          new_property_types: A list of property types that correspond to items in
+                              new_properties respectively by index
+          new_property_measurement_units: A list of measurement units that correspond to items in
+                              new_properties respectively by index
+
+        Returns:
+          data model in case of success, None otherwise
+        """
+        if new_property_types is None:
+            new_property_types = [str] * len(new_property_kinds)
+        # if new_property_measurement_units is None:
+        #     new_property_measurement_units = [""] * len(new_property_kinds)
+
+        if not (
+            len(new_property_kinds)
+            == len(new_property_types)
+            # == len(new_property_measurement_units)
+        ):
+            logging.error(
+                "Number of new properties kinds doesn't correspond properly with number of "
+                "new property kinds or values. All should be equal"
+            )
+            return None
+
+        data_model = self._load_ontology_data_model()
+        if data_model is None:
+            logging.error("Data model is empty. Couldn't find relationships")
+            return None
+        if relationship_kind in data_model:
+            for model_idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
+                if (kind_a, kind_b) == (knd_a, knd_b):
+                    for prop_idx, prop in enumerate(new_property_kinds):
+                        data_model[relationship_kind][model_idx][2][prop] = {
+                            "type": self._type2str(new_property_types)[prop_idx],
+                            # "measurement_unit": new_property_measurement_units[prop_idx],
+                        }
+            self._save_ontology_data_model(data_model)
+        else:
+            logging.error(
+                "Relationship_kind '%s' is not in data model", relationship_kind
+            )
+        return data_model[relationship_kind]
+
+    # Extra
+    def update_relationship_property_kinds(self):
         raise NotImplementedError
 
-    # bonus
-    def update_relationship_property_kind(self):
-        raise NotImplementedError
-
-    # bonus
+    # Extra
     def show_entity_kinds_hierarchy(self, with_properties: bool = False):
         """Displays the ontology kinds hierarchy in form of tree.
 
@@ -404,6 +577,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         else:
             tree.show()
 
+    # Extra
     def show_data_model(
         self,
     ):
@@ -660,6 +834,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
         except DatabaseError:
             logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
 
+    def get_all_entity_kinds(self):
+        return self.client.get_existing_classes()
+
+    def get_entity_kind(self, entity_kind: str):
+        return self.client.get_class_frame(entity_kind)
+
     def create_property_kinds(self, entity_kind: str, property_kinds: List[str], property_types: Optional[List[Type]]= None):
         return self._create_or_update_schema(
             entity_kind,
@@ -689,6 +869,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds(entity_kind_a, [relationship_kind], [entity_kind_b])
+
+# TODO: make it useable
+    def get_all_relationships(self, relationship_kind: str, id_a: str = "", id_b: str = ""):
+        for entity_kind, props in self.ontology.get_all_entity_kinds().items():
+            if relationship_kind in props:
+                print(entity_kind, props["name"])
 
     def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str]):
         self._delete_from_schema(entity_kind_a, relationship_kinds)
