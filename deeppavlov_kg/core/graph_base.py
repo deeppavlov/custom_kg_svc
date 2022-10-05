@@ -13,7 +13,7 @@ from deeppavlov_kg.core import querymaker
 from deeppavlov_kg.core.ontology_base import Neo4jOntologyConfig, TerminusdbOntologyConfig
 
 from terminusdb_client import WOQLClient
-from terminusdb_client.errors import InterfaceError
+from terminusdb_client.errors import InterfaceError, DatabaseError
 
 class KnowledgeGraph:
     def __init__(
@@ -856,10 +856,27 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
         entity = self.get_properties_of_entity(entity_id)
+
+        for idx, prop_kind in enumerate(property_kinds.copy()):
+            # if it's a relationship
+            if (not self.ontology.get_entity_kind(entity["@type"]).get(prop_kind)["@class"].startswith("xsd")
+               and prop_kind in entity):
+                entity[prop_kind].append(new_property_values[idx])
+                property_kinds.pop(idx)
+                new_property_values.pop(idx)
+
         entity.update({
                 **dict(zip(property_kinds, new_property_values)),
             })
-        return self._client.update_document(entity)
+        try:
+            return self._client.update_document(entity)
+        except DatabaseError as e:
+            raise DatabaseError(
+                f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
+                Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
+                Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
+                """
+            )
     
     def create_or_update_property_of_entity(self, entity_id: str, property_kind: str, new_property_value: Any):
         return self.create_or_update_properties_of_entity(entity_id, [property_kind], [new_property_value])

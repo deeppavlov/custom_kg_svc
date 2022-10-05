@@ -626,12 +626,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
     ):
         self.client = client
 
-    def _form_property_uri(self, entity_kind, property, prop_type="string"): # TODO: make it private
-        uri = f"<schema#{entity_kind}/{property}/Optional+xsd%3A{prop_type}> "
+    def _form_property_uri(self, entity_kind, property, prop_type="string", type_family="Optional"):
+        uri = f"<schema#{entity_kind}/{property}/{type_family}+xsd%3A{prop_type}> "
         return uri
 
     def _form_relationship_uri(self, entity_kind, relationship, related_kind):
-        uri = f"<schema#{entity_kind}/{relationship}/Optional+{related_kind}> "
+        uri = f"<schema#{entity_kind}/{relationship}/Set+{related_kind}> "
         return uri    
 
     def _get_schema(self):
@@ -652,9 +652,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
         entity_kind: str,
         property_kinds: Optional[List[str]] = None,
         property_types: Optional[List[Type]] = None,
-        properties_optionality: Optional[List[bool]] = None, # TODO: optional, set, mandatory, or list
+        properties_type_families: Optional[List[Type]] = None,
         relationship_kinds: Optional[List[Tuple[str, str]]] = None,
-        relationships_optionality: Optional[List[bool]] = None, # TODO: optional, set, mandatory, or list
     ):
         # TODO: check if the relationship kind exist raise an error
         # properties processing
@@ -671,37 +670,34 @@ class TerminusdbOntologyConfig(OntologyConfig):
             if property_types is not None:
                 property_types = TerminusdbOntologyConfig._type2str(property_types)
             
-            if properties_optionality is not None:
-                if len(properties_optionality) != len(property_kinds):
+            if properties_type_families is not None:
+                if len(properties_type_families) != len(property_kinds):
                     logging.error(
-                        "Number of property optionality items doesn't correspond properly with number of"
+                        "Number of property type families doesn't correspond properly with number of"
                         " property kinds. They should be equal"
                     )
-                for option in properties_optionality:
-                    if option not in [True, False]:
-                        logging.error(
-                            "Unknown optionality value. Should be one of %s", "[True, False]"
-                        )
+                valid_type_families = {list, set, Optional, "Mandatory"}
+                for type_family in properties_type_families:
+                    if type_family not in valid_type_families:
+                        raise ValueError("type_family must be one of %r", valid_type_families)
             else:
-                properties_optionality = [True] * len(property_kinds)
+                properties_type_families = [Optional] * len(property_kinds)
 
+            properties_type_families = self._type2str(properties_type_families)
             prop_definitions = []
             properties = []
-            for prop, type, optional in zip(property_kinds, property_types, properties_optionality):
-                if optional:
-                    prop_uri = self._form_property_uri(entity_kind, prop, type)
-                    prop_addition = f"""
-                        <schema#{prop}> {prop_uri}
-                    """
+            for prop, type, type_family in zip(property_kinds, property_types, properties_type_families):
+                prop_uri = self._form_property_uri(entity_kind, prop, type, type_family)
+                prop_addition = f"""
+                    <schema#{prop}> {prop_uri}
+                """
+                if type_family != "Mandatory":
                     prop_definition = f"""
                         {prop_uri}
-                          a sys:Optional ;
-                          sys:class xsd:{type} .
+                            a sys:{type_family} ;
+                            sys:class xsd:{type} .
                     """
                 else:
-                    prop_addition = f"""
-                        <schema#{prop}> xsd:{type} 
-                    """
                     prop_definition = ""
                 properties.append(prop_addition)
                 prop_definitions.append(prop_definition)
@@ -713,39 +709,19 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
         # Relationships processing
         if relationship_kinds:
-            if relationships_optionality is not None:
-                if len(relationships_optionality) != len(relationship_kinds):
-                    logging.error(
-                        "Number of relationship optionality items doesn't correspond properly with number of"
-                        " relationship kinds. They should be equal"
-                    )
-                for option in relationships_optionality:
-                    if option not in [True, False]:
-                        logging.error(
-                            "Unknown optionality value. Should be one of %s", "[True, False]"
-                        )
-            else:
-                relationships_optionality = [True] * len(relationship_kinds)
-
             rel_additions = []
             rel_definitions = []
-            for (relationship_kind, related_kind), optional in zip(relationship_kinds, relationships_optionality):
+            for (relationship_kind, related_kind) in relationship_kinds:
                 rel_uri = self._form_relationship_uri(entity_kind, relationship_kind, related_kind)
-                if optional:
-                    rel_addition = f"""
-                        <schema#{relationship_kind}> {rel_uri} 
-                    """ 
+                rel_addition = f"""
+                    <schema#{relationship_kind}> {rel_uri} 
+                """ 
 
-                    rel_definition = f"""
-                        {rel_uri}
-                            a sys:Optional ;
-                            sys:class <schema#{related_kind}> .
-                    """
-                else:
-                    rel_addition = f"""
-                        <schema#{relationship_kind}> <schema#{related_kind}>
-                    """
-                    rel_definition = ""
+                rel_definition = f"""
+                    {rel_uri}
+                        a sys:Set ;
+                        sys:class <schema#{related_kind}> .
+                """
                 rel_additions.append(rel_addition)
                 rel_definitions.append(rel_definition)
             ttl_relationships = " ;\n".join(rel_additions)
@@ -831,6 +807,10 @@ class TerminusdbOntologyConfig(OntologyConfig):
             datetime.date: "date",
             datetime.time: "time",
             datetime.datetime: "datetime",
+            list: "List",
+            set: "Set",
+            Optional: "Optional",
+            "Mandatory": "Mandatory",
         }
         for item in types_to_convert:
             types_str.append(types.get(item))
@@ -867,15 +847,28 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def get_entity_kind(self, entity_kind: str):
         return self.client.get_class_frame(entity_kind)
 
-    def create_property_kinds(self, entity_kind: str, property_kinds: List[str], property_types: Optional[List[Type]]= None):
+    def create_property_kinds(
+        self,
+        entity_kind: str,
+        property_kinds: List[str],
+        property_types: Optional[List[Type]]= None,
+        properties_type_families: Optional[List[Type]] = None,
+    ):
         return self._create_or_update_schema(
             entity_kind,
             property_kinds,
             property_types,
+            properties_type_families,
         )
 
-    def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
-        return self.create_property_kinds(entity_kind, [property_kind], [property_type])
+    def create_property_kind(
+        self,
+        entity_kind: str,
+        property_kind: str,
+        property_type: Type,
+        property_type_family: Optional[Type] = None,
+    ):
+        return self.create_property_kinds(entity_kind, [property_kind], [property_type], [property_type_family])
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         return self._delete_from_schema(entity_kind, property_kinds)
@@ -897,11 +890,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds(entity_kind_a, [relationship_kind], [entity_kind_b])
 
-# TODO: make it useable
-    def get_all_relationships(self, relationship_kind: str, id_a: str = "", id_b: str = ""):
-        for entity_kind, props in self.ontology.get_all_entity_kinds().items():
+    def get_relationship(self, relationship_kind: str):
+        relationship_details = []
+        for entity_kind, props in self.get_all_entity_kinds().items():
             if relationship_kind in props:
-                print(entity_kind, props["name"])
+                relationship_details.append((entity_kind, props[relationship_kind]["@class"]))
+        return relationship_details
 
     def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str]):
         self._delete_from_schema(entity_kind_a, relationship_kinds)
