@@ -45,7 +45,7 @@ class OntologyConfig:
     def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
         raise NotImplementedError
 
-    def delete_property_kinds(self, entity_kinds: List[str], property_kinds: List[str]):
+    def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         raise NotImplementedError
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
@@ -57,15 +57,10 @@ class OntologyConfig:
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         raise NotImplementedError
 
+    def get_relationship(self, relationship_kind: str):
+        raise NotImplementedError
+
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
-        raise NotImplementedError
-
-    # Extra
-    def create_relationship_property_kind(self):
-        raise NotImplementedError
-
-    # Extra
-    def update_relationship_property_kind(self):
         raise NotImplementedError
 
 
@@ -415,11 +410,24 @@ class Neo4jOntologyConfig(OntologyConfig):
     def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
         self.create_property_kinds(entity_kind, [property_kind], [property_type])
 
-    def delete_property_kinds(self, entity_kinds: List[str], property_kinds: List[str]):
-        raise NotImplementedError
+    def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
+        tree = self._load_ontology_kinds_hierarchy()
+        kind_node = self._get_node_from_tree(tree, entity_kind)
+        if kind_node is not None and tree is not None:
+            for property_kind in property_kinds:
+                if property_kind in kind_node.data.properties:
+                    kind_node.data.properties.pop(property_kind)
+                else:
+                    logging.warning(f"The property:'{property_kind}' does not exist in ontology kinds hierarchy. "
+                                    "no property was deleted.")
+
+            self._save_ontology_kinds_hierarchy(tree)
+        else:
+            logging.warning(f"The ontology kinds hierarych is empty or the entity kind '{entity_kind}' doesn't exist. "
+                            "no property was deleted.")
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
-        raise NotImplementedError
+        return self.delete_property_kinds(entity_kind, [property_kind])
 
     def create_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str], entity_kinds_b: List[str]):
         raise NotImplementedError
@@ -495,8 +503,27 @@ class Neo4jOntologyConfig(OntologyConfig):
             entity_kind_b,
         )
 
+    def get_relationship(self, relationship_kind: str):
+        """Returns the relationship two-possible-parties as well as its properties."""
+        data_model = self._load_ontology_data_model()
+        if data_model is not None:
+            kind = data_model.get(relationship_kind)
+            return kind
+        else:
+            return None
+
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
-        raise NotImplementedError
+        data_model = self._load_ontology_data_model()
+        if data_model is not None:
+            if relationship_kind in data_model:
+                for idx, relationship in enumerate(data_model[relationship_kind]):
+                    if [entity_kind_a, entity_kind_b] == [relationship[0], relationship[1]]:
+                        data_model[relationship_kind].pop(idx)
+                self._save_ontology_data_model(data_model)
+            else:
+                logging.warning("The given relationship doesn't exist. No relationship kind has been deleted")
+        else:
+            logging.warning("The data model is empty. No relationship kind has been deleted")
 
     # Extra
     def create_relationship_property_kinds(
