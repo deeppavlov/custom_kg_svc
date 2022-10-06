@@ -901,11 +901,19 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             )
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
+        entity_kind = self.get_properties_of_entity(entity_id)["@type"]
+        entity_kind_properties = self.ontology.get_entity_kind(entity_kind)
+        for prop_kind in property_kinds:
+            if prop_kind not in entity_kind_properties:
+                raise ValueError(f"Property {prop_kind} should be in the ontology before adding it to graph")
         entity = self.get_properties_of_entity(entity_id)
 
         for idx, prop_kind in enumerate(property_kinds.copy()):
+            entity_props = self.ontology.get_entity_kind(entity["@type"])
+            if prop_kind not in entity_props:
+                continue
             # if it's a relationship
-            if (not self.ontology.get_entity_kind(entity["@type"]).get(prop_kind)["@class"].startswith("xsd")
+            if (not entity_props.get(prop_kind)["@class"].startswith("xsd")
                and prop_kind in entity):
                 entity[prop_kind].append(new_property_values[idx])
                 property_kinds.pop(idx)
