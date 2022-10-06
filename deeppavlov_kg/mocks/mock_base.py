@@ -4,8 +4,7 @@ from terminusdb_client import WOQLClient, WOQLQuery as WOQL
 from terminusdb_client.woqlschema import WOQLSchema, DocumentTemplate, LexicalKey
 from terminusdb_client.schema.schema import TerminusClass
 
-from deeppavlov_kg.core.graph_base import Neo4jKnowledgeGraph, TerminusdbKnowledgeGraph
-from deeppavlov_kg.core.ontology_base import OntologyConfig, Neo4jOntologyConfig, TerminusdbOntologyConfig
+from deeppavlov_kg.core.graph import Neo4jKnowledgeGraph, TerminusdbKnowledgeGraph
 
 DB = "test9"
 TEAM ="Ramimashkouk|1f65"
@@ -37,9 +36,7 @@ neo_kg.create_entity("Habit", "Habit/Sport", ["name"], ["Sport"])
 neo_kg.create_entity("Person", "Person/Sandy", ["name", "height"], ["Sandy Bates", 160])
 neo_kg.create_entity("Habit", "Habit/Reading", ["name"], ["Reading"])
 
-neo_kg.ontology.create_relationship_kind("Person", "LIKES", "Habit")
-neo_kg.ontology.create_property_kinds("Person", ["how much"])
-neo_kg.create_relationship("Person/Sandy", "LIKES", "Habit/Reading", ["how much"], ["so much :)"])
+neo_kg.create_relationship("Person/Sandy", "LIKES", "Habit/Reading")
 
 neo_kg.create_or_update_properties_of_entities(["Person/Sandy", "Person/Jack"], ["height", "weight"], [165, 70])
 neo_kg.create_or_update_properties_of_entity("Person/Sandy", ["height", "weight"], [166, 77])
@@ -51,13 +48,13 @@ neo_kg.get_all_entities()
 ts = datetime.datetime(2022,10,30)
 neo_kg.get_entities_by_date(["Person/Sandy"], ts)
 
-# neo_kg.ontology.delete_property_kinds("Person", ["HATE"])
-# neo_kg.ontology.delete_relationship_kind("Person", "LIKES", "Habit")
-# neo_kg.delete_property_from_entity("Habit/Reading", "name")
-# neo_kg.delete_properties_from_entity("Habit/Sandy", ["height", "weight"])
-# neo_kg.delete_properties_from_entities(["Person/Sandy", "Person/Jack"], ["height", "name"])
+# # neo_kg.ontology.delete_property_kinds("Person", ["HATE"])
+# # neo_kg.ontology.delete_relationship_kind("Person", "LIKES", "Habit")
+# # neo_kg.delete_property_from_entity("Habit/Reading", "name")
+# # neo_kg.delete_properties_from_entity("Habit/Sandy", ["height", "weight"])
 
 # neo_kg.delete_entity("Person/Jack")
+
 
 terminus_kg.drop_database()
 
@@ -67,33 +64,31 @@ terminus_kg.ontology.create_entity_kind("interest")
 
 terminus_kg.ontology.create_property_kinds("Person", ["height", "name", "weight"], [int, str, int])
 terminus_kg.ontology.create_property_kinds("Habit", ["name"], [str])
-terminus_kg.ontology.create_relationship_kinds("Person", ["LIKES", "HATES"], ["Habit", "Habit"])
-terminus_kg.ontology.create_relationship_kind("Habit", "is_the_same_of", "interest")
-
-terminus_kg.create_entity("Person", "Person/Jack", ["name", "height"], ["Jack Ryan", 180])
+terminus_kg.ontology.create_relationship_kind("Person", "LIKES", "Habit")
+terminus_kg.ontology.create_relationship_kind("Person", "HATES", "Habit")
+terminus_kg.create_entity("Person", "Person/Jack", ["name", "height",], ["Jack Ryan", 180])
 terminus_kg.create_entity("Habit", "Habit/Sport", ["name"], ["Sport"])
 terminus_kg.create_entity("Person", "Person/Sandy", ["name", "height"], ["Sandy Bates", 160])
 terminus_kg.create_entity("Habit", "Habit/Reading", ["name"], ["Reading"])
+
+terminus_kg.create_relationship("Person/Sandy", "LIKES", "Habit/Reading")
 
 terminus_kg.create_or_update_properties_of_entities(["Person/Sandy", "Person/Jack"], ["height", "weight"], [165, 70])
 terminus_kg.create_or_update_properties_of_entity("Person/Sandy", ["height", "weight"], [166, 77])
 terminus_kg.create_or_update_property_of_entity("Person/Jack", "height", 170)
 
-terminus_kg.create_relationship("Person/Jack", "LIKES", "Habit/Reading")
-terminus_kg.create_relationship("Person/Jack", "LIKES", "Habit/Sport")
-
-terminus_kg.ontology.create_property_kind("Person", "eyes_colors", str, set)
-terminus_kg.create_or_update_property_of_entity("Person/Jack", "eyes_colors", ["green","blue"])
-
 terminus_kg.get_properties_of_entity("Person/Sandy")
 terminus_kg.get_all_entities()
-terminus_kg.get_entities_by_date(["Person/Jack", "Person/Sandy"], ts)
-terminus_kg.get_entity_by_date("Person/Jack", ts)
-terminus_kg.update_relationship("Person/Sandy", "LIKES", "Habit/Sport")
 
+ts = datetime.datetime(2022,10,30)
+terminus_kg.get_entities_by_date(["Person/Sandy"], ts)
+
+# terminus_kg.ontology.delete_property_kinds("Person", ["HATE"])
+# terminus_kg.ontology.delete_relationship_kind("Person", "LIKES")
 # terminus_kg.delete_property_from_entity("Habit/Reading", "name")
-# terminus_kg.delete_properties_from_entity("Habit/Sandy", ["height", "weight"])
+# terminus_kg.delete_properties_from_entity("Person/Sandy", ["height", "weight"])
 # terminus_kg.delete_properties_from_entities(["Person/Sandy", "Person/Jack"], ["height", "name"])
+
 # terminus_kg.delete_entity("Person/Jack")
 
 print("end")
