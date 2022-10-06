@@ -4,3 +4,4 @@ fabulist==1.2.0
 mimesis==5.3.0
 pylint==2.13.8
 treelib==1.6.1
+-e git+https://github.com/terminusdb/terminusdb-client-python.git@fdb9a73#egg=terminusdb_client
