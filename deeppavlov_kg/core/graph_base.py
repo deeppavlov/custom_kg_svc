@@ -1,5 +1,3 @@
-from asyncio.proactor_events import _ProactorBasePipeTransport
-from importlib.metadata import entry_points
 import os
 from pathlib import Path
 from typing import Any, Optional, List, Tuple, Union
@@ -12,7 +10,7 @@ from deeppavlov_kg.core.ontology import Ontology
 from deeppavlov_kg.core import querymaker
 from deeppavlov_kg.core.ontology_base import Neo4jOntologyConfig, TerminusdbOntologyConfig
 
-from terminusdb_client import WOQLClient
+from terminusdb_client import WOQLClient, WOQLQuery as WOQL
 from terminusdb_client.errors import InterfaceError, DatabaseError
 
 class KnowledgeGraph:
@@ -114,6 +112,12 @@ class KnowledgeGraph:
         raise NotImplementedError
 
     def delete_relationship(self, id_a: str, relationship_kind: str, id_b: str):
+        raise NotImplementedError
+
+    def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
+        raise NotImplementedError
+
+    def get_entity_by_date(self, entity_id: str, date_to_inspect: datetime.datetime):
         raise NotImplementedError
 
 class Neo4jKnowledgeGraph(KnowledgeGraph):
@@ -813,6 +817,46 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         result, _ = db.cypher_query(query, params)
         return result
 
+    def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
+        """Returns the active state nodes on a given date for many entities.
+
+        Args:
+          list_of_ids: Entity ids
+          date_to_inspect: Date, on which the state is required.
+                           Should be of format: "%Y-%m-%dT%H:%M:%S"
+
+        returns:
+          State nodes in case of success or None in case of error.
+        """
+        match_a, node_properties_filter = querymaker.match_node_query("a")
+        where_id = querymaker.where_property_value_in_list_query("a", "Id", entity_ids)
+        match_r, rel_properties_filter = querymaker.match_relationship_cypher_query(
+            var_name_a="a",
+            var_name_r="has_state",
+            relationship_kind="HAS_STATE",
+            rel_properties_filter={},
+            var_name_b="state",
+        )
+        date_to_inspect = date_to_inspect.strftime("%Y-%m-%dT%H:%M:%S")
+        where_on_date = querymaker.where_state_on_date(date_to_inspect)
+
+        return_query = querymaker.return_nodes_or_relationships_query(["state"])
+
+        query = "\n".join([match_a, where_id, match_r, where_on_date, return_query])
+        params = {**node_properties_filter, **rel_properties_filter}
+
+        state_nodes, _ = db.cypher_query(query, params)
+
+        if state_nodes:
+            return [dict(node[0].items()) for node in state_nodes]
+        else:
+            return None
+
+    def get_entity_by_date(self, entity_id: str, date_to_inspect: datetime.datetime):
+        entities = self.get_entities_by_date([entity_id], date_to_inspect)
+        if entities:
+            return entities[0]
+
 class TerminusdbKnowledgeGraph(KnowledgeGraph):
     def __init__(
         self,
@@ -933,3 +977,24 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
 
     def delete_relationship(self, id_a: str, relationship_kind: str, id_b: Optional[str] = None):
         return self.create_or_update_property_of_entity(id_a, relationship_kind, None)
+
+    def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
+        history = self._client.get_commit_history()
+        commits = [commit for commit in history if commit["timestamp"]<=date_to_inspect]
+        if not commits:
+            raise ValueError("At provided timestamp no commit has been committed to database yet")
+        commit_id = commits[0]["identifier"]
+        path = f"{self._team}/{self._db}/local/commit/{commit_id}"
+        queries = [
+                WOQL().using(
+                    path,
+                    WOQL().read_object(f"terminusdb:///data/{entity_id}", f"v:{entity_id}")
+                ) for entity_id in entity_ids
+        ]
+        query_result = self._client.query(WOQL().woql_and(*queries))
+        return query_result["bindings"]
+
+    def get_entity_by_date(self, entity_id: str, date_to_inspect: datetime.datetime):
+        entities = self.get_entities_by_date([entity_id], date_to_inspect)
+        if entities:
+            return entities[0][entity_id]
