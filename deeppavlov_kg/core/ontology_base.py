@@ -624,7 +624,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         self,
         client,
     ):
-        self.client = client
+        self._client = client
 
     def _form_property_uri(self, entity_kind, property, prop_type="string", type_family="Optional"):
         uri = f"<schema#{entity_kind}/{property}/{type_family}+xsd%3A{prop_type}> "
@@ -635,7 +635,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return uri    
 
     def _get_schema(self):
-        ttl_schema = self.client.get_triples("schema")
+        ttl_schema = self._client.get_triples("schema")
         ttl_schema = "\n".join([
             ttl_schema[:ttl_schema.rfind("\n\n")] ,
             """
@@ -754,7 +754,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             sys:base "terminusdb:///data/"^^xsd:string ;
             sys:schema "terminusdb:///schema#"^^xsd:string .
         """
-        return self.client.insert_triples(
+        return self._client.insert_triples(
             graph_type='schema',
             content=ttl_schema,
             commit_msg="Insert triples"
@@ -791,7 +791,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         ttl_schema = ".".join(new_instructions)
 
         try:
-            return self.client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
+            return self._client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
         except DatabaseError:
             logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
 
@@ -837,15 +837,15 @@ class TerminusdbOntologyConfig(OntologyConfig):
             new_instructions.append(instruction)
         ttl_schema = ".".join(new_instructions)
         try:
-            return self.client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
+            return self._client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
         except DatabaseError:
             logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
 
     def get_all_entity_kinds(self):
-        return self.client.get_existing_classes()
+        return self._client.get_existing_classes()
 
     def get_entity_kind(self, entity_kind: str):
-        return self.client.get_class_frame(entity_kind)
+        return self._client.get_class_frame(entity_kind)
 
     def create_property_kinds(
         self,

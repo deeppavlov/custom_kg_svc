@@ -821,10 +821,12 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
     ):
         endpoint = f"https://cloud.terminusdb.com/{team}/"
         self._client   = WOQLClient(endpoint)
+        self._team = team
+        self._db = db_name
         try:
-            self._client.connect(team=team, use_token=True, db=db_name)
+            self._client.connect(team=self._team, use_token=True, db=self._db)
         except InterfaceError:
-            self._client.connect(team=team, use_token=True)
+            self._client.connect(team=self._team, use_token=True)
             self._client.create_database(db_name)
         self.ontology = TerminusdbOntologyConfig(self._client)
 
