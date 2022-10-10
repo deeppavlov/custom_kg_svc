@@ -861,16 +861,27 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self,
         team: str,
         db_name: str,
+        local: bool = False,
+        username: str = "admin",
+        password: str = "root",
     ):
-        endpoint = f"https://cloud.terminusdb.com/{team}/"
-        self._client   = WOQLClient(endpoint)
         self._team = team
         self._db = db_name
-        try:
-            self._client.connect(team=self._team, use_token=True, db=self._db)
-        except InterfaceError:
-            self._client.connect(team=self._team, use_token=True)
-            self._client.create_database(db_name)
+        if local:
+            self._client = WOQLClient("http://localhost:6363", account=username, team=self._team, key=password)
+            try:
+                self._client.connect(team=self._team, db=self._db)
+            except InterfaceError:
+                self._client.connect(team=self._team)
+                self._client.create_database(db_name)
+        else:
+            endpoint = f"https://cloud.terminusdb.com/{self._team}/"
+            self._client   = WOQLClient(endpoint)
+            try:
+                self._client.connect(team=self._team, use_token=True, db=self._db)
+            except InterfaceError:
+                self._client.connect(team=self._team, use_token=True)
+                self._client.create_database(db_name)
         self.ontology = TerminusdbOntologyConfig(self._client)
 
     def drop_database(self):
