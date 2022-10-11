@@ -311,7 +311,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
 
         Args:
           kind: entity kind
-          id_: Entity id
+          entity_id: Entity id
           property_kinds: Entity properties
           property_values: Entity property values
           create_date: entity creation date
@@ -366,7 +366,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         """Makes an entity a thing of the past by marking it as deleted using the _deleted property.
 
         Args:
-          id_: entity id
+          entity_id: entity id
           deletion_date: the date of entity deletion
 
         Returns:
@@ -391,12 +391,12 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         new_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
-        """Updates and Adds properties of entities for batch operations.
+        """Updates and Adds a batch of properties of a batch of entities.
 
         Args:
-          list_of_ids: entities ids
-          list_of_property_kinds: properties kinds to be updated or added
-          list_of_property_values: properties values that correspond respectively to property_kinds
+          entity_ids: entities ids
+          property_kinds: properties kinds to be updated or added
+          new_property_values: properties values that correspond respectively to property_kinds
           change_date: the date of entities updating
 
         Returns:
@@ -458,12 +458,12 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         new_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
-        """Updates and Adds entity properties.
+        """Updates and Adds a batch of properties of a single entity.
 
         Args:
-          id_: entity id
-          list_of_property_kinds: properties kinds to be updated or added
-          list_of_property_values: properties values that correspont respectively to property_kinds
+          entity_id: entity id
+          property_kinds: properties kinds to be updated or added
+          new_property_values: properties values that correspont respectively to property_kinds
           change_date: the date of entity updating
 
         Returns:
@@ -489,7 +489,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         """Updates a single property of a given entity.
 
         Args:
-          id_: entity id
+          entity_kind: entity id
           property_kind: kind of the property
           property_value: value of the property
           change_date: the date of entity updating
@@ -516,10 +516,10 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         property_kinds: List[str],
         change_date: Optional[datetime.datetime] = None,
     ):
-        """Removes a property from a given entity.
+        """Removes a batch of properties from a given entity.
 
         Args:
-           id_: entity id
+           entity_id: entity id
            property_kinds: property keys to be removed
            change_date: the date of node updating
 
@@ -553,9 +553,19 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         return node
 
     def delete_property_from_entity(self, entity_id: str, property_kind: str):
+        """Removes a property from a given entity.
+
+        Args:
+           entity_id: entity id
+           property_kind: property kind to be removed
+
+        Returns:
+          State node in case of success or None in case of error.
+        """
         return self.delete_properties_from_entity(entity_id, [property_kind])
 
     def get_all_entities(self):
+        """Returns all entities in the database with their properties."""
         all_entity_ids = []
         properties_of_all_entities = []
         if self.db_ids_file_path.exists():
@@ -569,6 +579,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         return properties_of_all_entities
 
     def get_properties_of_entity(self, entity_id: str):
+        """Returns properties of an entity"""
         return dict(self._get_current_state_node(entity_id).items())
 
     def create_relationship(
@@ -655,9 +666,11 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
 
         Args:
           relationship_kind: relationship type
-          rel_properties_filter: relationship keyword properties for matching
           id_a: id of entity A
           id_b: id of entity B
+          rel_properties_filter: relationship keyword properties for matching
+          kind_a: kind of entity A
+          kind_b: kind of entity B
           limit: maximum number of relationships to be returned
           return_query_instead_of_relationships: False for returning the found relationship.
                       True for returning (query, params) of that relationship matching.
@@ -721,11 +734,11 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         updated_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
     ):
-        """Updates a relationship properties.
+        """Creates or updates a relationship properties.
 
         Args:
-          relationship_kind: relationship type
           id_a: id of entity A
+          relationship_kind: relationship type
           id_b: id of entity B
           updated_property_kinds: Entity properties to be updated
           updated_property_values: New entity property values
@@ -817,7 +830,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         return result
 
     def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
-        """Returns the active state nodes on a given date for many entities.
+        """Returns a batch of entities properties, which were valid on the inspected date.
 
         Args:
           list_of_ids: Entity ids
@@ -852,6 +865,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             return None
 
     def get_entity_by_date(self, entity_id: str, date_to_inspect: datetime.datetime):
+        """Returns an entity properties, which were valid on the inspected date."""
         entities = self.get_entities_by_date([entity_id], date_to_inspect)
         if entities:
             return entities[0]

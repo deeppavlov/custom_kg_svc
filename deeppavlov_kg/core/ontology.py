@@ -138,8 +138,8 @@ class Neo4jOntologyConfig(OntologyConfig):
         list_of_property_values: List[Any],
         entity_kind: str,
     ):
-        """Checks if all the properties in the list are in fact properties of 'kind' in
-        the ontology graph.
+        """Checks for presence of the given property kinds in the ontology and checks if the
+        property value type matches the expected type in ontology.
         """
         kind_properties = self.get_entity_kind(entity_kind)
         for idx, prop in enumerate(list_of_property_kinds):
@@ -174,7 +174,8 @@ class Neo4jOntologyConfig(OntologyConfig):
           kind_a: kind of first entity (from)
           relationship_kind: kind of relationship
           kind_b: kind of second entity (to)
-          rel_properties: list of properties, a relationship could have
+          rel_property_kinds: list of property kinds
+          rel_property_values: list of property values
 
         Returns:
           False in case the relationship is invalid (not in data model)
@@ -358,6 +359,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         """Creates a list of properties of a given kind
 
         Args:
+          kind: entity kind to which we're creating properties
           new_property_kinds: New property kinds
           new_property_types: A list of property types that correspond to items in
                                kind_properties respectively by index
@@ -411,6 +413,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         self.create_property_kinds(entity_kind, [property_kind], [property_type])
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
+        """Deletes property kinds that relate to specific entity kind from the ontology"""
         tree = self._load_ontology_kinds_hierarchy()
         kind_node = self._get_node_from_tree(tree, entity_kind)
         if kind_node is not None and tree is not None:
@@ -427,6 +430,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                             "no property was deleted.")
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
+        """Deletes property kind that relates to specific entity kind from the ontology"""
         return self.delete_property_kinds(entity_kind, [property_kind])
 
     def create_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str], entity_kinds_b: List[str]):
@@ -437,9 +441,9 @@ class Neo4jOntologyConfig(OntologyConfig):
         to make creation of such relationship in the graph possible.
 
         Args:
-          kind_a: kind of first entity (from)
+          entity_kind_a: kind of first entity (from)
           relationship_kind: kind of relationship
-          kind_b: kind of second entity (to)
+          entity_kind_b: kind of second entity (to)
           rel_property_kinds: list of properties, a relationship could have,
           kind_property_types: A list of property types that correspond to items in
                                rel_property_kinds respectively by index
@@ -528,21 +532,20 @@ class Neo4jOntologyConfig(OntologyConfig):
     # Extra
     def create_relationship_property_kinds(
         self,
-        kind_a: str,
         relationship_kind: str,
-        kind_b: str,
         new_property_kinds: List[str],
         new_property_types: Optional[List[Type]] = None,
         # new_property_measurement_units: Optional[List[str]] = None,
     ):
-        """Creates a list of properties of a given kind
+        """Creates a list of properties for a relationship
 
         Args:
-          new_properties: list of properties, a relationship could have,
+          relationship_kind: kind of relationship
+          new_property_kinds: list of properties, a relationship could have,
           new_property_types: A list of property types that correspond to items in
-                              new_properties respectively by index
-          new_property_measurement_units: A list of measurement units that correspond to items in
-                              new_properties respectively by index
+                               rel_property_kinds respectively by index
+          kind_property_measurement_units: A list of measurement units that correspond to items in
+                               rel_property_kinds respectively by index
 
         Returns:
           data model in case of success, None otherwise
