@@ -23,7 +23,8 @@ neo_kg = Neo4jKnowledgeGraph(
 
 neo_kg.drop_database()
 
-neo_kg.ontology.create_entity_kind("Person")
+neo_kg.ontology.create_entity_kind("Human")
+neo_kg.ontology.create_entity_kind("Person", parent="Human")
 neo_kg.ontology.create_entity_kind("Habit")
 neo_kg.ontology.create_entity_kind("interest")
 
@@ -58,7 +59,8 @@ neo_kg.get_entities_by_date(["Person/Sandy"], ts)
 
 terminus_kg.drop_database()
 
-terminus_kg.ontology.create_entity_kind("Person")
+terminus_kg.ontology.create_entity_kind("Human")
+terminus_kg.ontology.create_entity_kind("Person", parent="Human")
 terminus_kg.ontology.create_entity_kind("Habit")
 terminus_kg.ontology.create_entity_kind("interest")
 

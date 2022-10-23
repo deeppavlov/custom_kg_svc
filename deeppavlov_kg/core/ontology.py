@@ -274,8 +274,8 @@ class Neo4jOntologyConfig(OntologyConfig):
                 " property measurement_units. They should be equal"
             )
 
-        kind = kind.capitalize()
-        parent = parent.capitalize()
+        # kind = kind.capitalize()
+        # parent = parent.capitalize()
 
         if start_tree is None:
             start_tree = self._load_ontology_kinds_hierarchy()
@@ -653,6 +653,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def _create_or_update_schema(
         self,
         entity_kind: str,
+        parent: Optional[str] = None,
         property_kinds: Optional[List[str]] = None,
         property_types: Optional[List[Type]] = None,
         properties_type_families: Optional[List[Type]] = None,
@@ -660,6 +661,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
     ):
         # TODO: check if the relationship kind exist raise an error
         # properties processing
+
+        if parent is not None:
+            inherits_parent = f"sys:inherits <schema#{parent}> ;"
+        else:
+            inherits_parent = ""
+
         if property_kinds is not None:
             if property_types is not None:
                 if len(property_types) != len(property_kinds):
@@ -748,6 +755,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             @prefix doc: <data/> .
             <schema#{entity_kind}>
             a sys:Class ;
+            {inherits_parent}
               {ttl_properties}
               {ttl_relationships} .
             {ttl_prop_definitions}
@@ -819,8 +827,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             types_str.append(types.get(item))
         return types_str
 
-    def create_entity_kind(self, entity_kind: str):
-        return self._create_or_update_schema(entity_kind)
+    def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
+        return self._create_or_update_schema(entity_kind, parent)
 
     def delete_entity_kind(self, entity_kind: str):
         ttl_schema = self._get_schema()
@@ -859,16 +867,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
     ):
         return self._create_or_update_schema(
             entity_kind,
-            property_kinds,
-            property_types,
-            properties_type_families,
+            property_kinds=property_kinds,
+            property_types=property_types,
+            properties_type_families=properties_type_families,
         )
 
     def create_property_kind(
         self,
         entity_kind: str,
         property_kind: str,
-        property_type: Type,
+        property_type: Optional[Type] = None,
         property_type_family: Optional[Type] = None,
     ):
         return self.create_property_kinds(entity_kind, [property_kind], [property_type], [property_type_family])
