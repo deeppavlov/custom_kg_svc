@@ -689,7 +689,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 valid_type_families = {list, set, Optional, "Mandatory"}
                 for type_family in properties_type_families:
                     if type_family not in valid_type_families:
-                        raise ValueError("type_family must be one of %r", valid_type_families)
+                        raise ValueError(f"type_family must be one of {valid_type_families}. Got {type_family}")
             else:
                 properties_type_families = [Optional] * len(property_kinds)
 
@@ -741,6 +741,18 @@ class TerminusdbOntologyConfig(OntologyConfig):
             ttl_rel_definitions = ""
 
         ttl_schema = f"""
+            <schema#{entity_kind}>
+            a sys:Class ;
+            {inherits_parent}
+              {ttl_properties}
+              {ttl_relationships} .
+            {ttl_prop_definitions}
+            {ttl_rel_definitions}
+        """
+        return ttl_schema
+
+    def _commit_to_schema(self, ttl_schema: str):
+        ttl_schema_prefixes = f"""
             @base <terminusdb:///schema#> .
             @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
             @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -753,18 +765,15 @@ class TerminusdbOntologyConfig(OntologyConfig):
             @prefix api: <http://terminusdb.com/schema/api#> .
             @prefix owl: <http://www.w3.org/2002/07/owl#> .
             @prefix doc: <data/> .
-            <schema#{entity_kind}>
-            a sys:Class ;
-            {inherits_parent}
-              {ttl_properties}
-              {ttl_relationships} .
-            {ttl_prop_definitions}
-            {ttl_rel_definitions}
-            <terminusdb://context>
+        """
+        ttl_schema_tail = """<terminusdb://context>
             a sys:Context ;
             sys:base "terminusdb:///data/"^^xsd:string ;
             sys:schema "terminusdb:///schema#"^^xsd:string .
         """
+        ttl_schema = "\n".join([
+            ttl_schema_prefixes, ttl_schema, ttl_schema_tail
+        ])
         return self._client.insert_triples(
             graph_type='schema',
             content=ttl_schema,
@@ -827,6 +836,26 @@ class TerminusdbOntologyConfig(OntologyConfig):
             types_str.append(types.get(item))
         return types_str
 
+    def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
+        if parents is None:
+            parents = [None]*len(entity_kinds)
+        ttl_schema_parts = []
+        for (
+            entity_kind,
+            parent,
+        ) in zip(
+            entity_kinds,
+            parents,
+        ):
+            ttl_schema_parts.append(
+                self._create_or_update_schema(
+                    entity_kind,
+                    parent=parent,
+                )
+            )
+            ttl_schema = "\n".join(ttl_schema_parts)
+        return self._commit_to_schema(ttl_schema)
+
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self._create_or_update_schema(entity_kind, parent)
 
@@ -856,20 +885,54 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return self._client.get_existing_classes()
 
     def get_entity_kind(self, entity_kind: str):
-        return self._client.get_class_frame(entity_kind)
+        return self.get_all_entity_kinds().get(entity_kind)
 
-    def create_property_kinds(
+    def create_property_kinds_of_entity_kinds(
+        self,
+        entity_kinds: List[str],
+        property_kinds: List[List[str]],
+        property_types: Optional[List[List[Type]]]= None,
+        properties_type_families: Optional[List[List[Type]]] = None,
+    ):
+        ttl_schema_parts = []
+        if properties_type_families is None:
+            properties_type_families = [None] * len(entity_kinds)
+        if property_types is None:
+            property_types = [None] * len(entity_kinds)
+        for (
+            entity_kind,
+            property_kinds_for_this_entity_kind,
+            property_types_for_this_entity_kind,
+            properties_type_families_for_this_entity_kind,
+        ) in zip(
+            entity_kinds,
+            property_kinds,
+            property_types,
+            properties_type_families,
+        ):
+            ttl_schema_parts.append(
+                self._create_or_update_schema(
+                    entity_kind,
+                    property_kinds=property_kinds_for_this_entity_kind,
+                    property_types=property_types_for_this_entity_kind,
+                    properties_type_families=properties_type_families_for_this_entity_kind,
+                )
+            )
+        ttl_schema = "\n".join(ttl_schema_parts)
+        return self._commit_to_schema(ttl_schema)
+
+    def create_property_kinds_of_one_entity_kind(
         self,
         entity_kind: str,
         property_kinds: List[str],
         property_types: Optional[List[Type]]= None,
         properties_type_families: Optional[List[Type]] = None,
     ):
-        return self._create_or_update_schema(
-            entity_kind,
-            property_kinds=property_kinds,
-            property_types=property_types,
-            properties_type_families=properties_type_families,
+        return self.create_property_kinds_of_entity_kinds(
+            [entity_kind],
+            [property_kinds],
+            [property_types],
+            [properties_type_families],
         )
 
     def create_property_kind(
@@ -879,7 +942,13 @@ class TerminusdbOntologyConfig(OntologyConfig):
         property_type: Optional[Type] = None,
         property_type_family: Optional[Type] = None,
     ):
-        return self.create_property_kinds(entity_kind, [property_kind], [property_type], [property_type_family])
+        if property_type is not None:
+            property_type = [property_type]
+        if property_type_family is not None:
+            property_type_family = [property_type_family]
+        return self.create_property_kinds_of_entity_kinds(
+            [entity_kind], [[property_kind]], [property_type], [property_type_family]
+        )
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         return self._delete_from_schema(entity_kind, property_kinds)
@@ -889,17 +958,31 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
     def create_relationship_kinds(
         self,
-        entity_kind_a: str,
+        entity_kinds_a: List[str],
         relationship_kinds: List[str],
         entity_kinds_b: List[str],
     ):
-        return self._create_or_update_schema(
-                entity_kind_a,
-                relationship_kinds=list(zip(relationship_kinds, entity_kinds_b)),
+        ttl_schema_parts = []
+        for (
+            entity_kind,
+            relationship_kind,
+            entity_kind_b,
+        ) in zip(
+            entity_kinds_a,
+            relationship_kinds,
+            entity_kinds_b,
+        ):
+            ttl_schema_parts.append(
+                self._create_or_update_schema(
+                    entity_kind,
+                    relationship_kinds=[(relationship_kind, entity_kind_b)],
+                )
             )
+        ttl_schema = "\n".join(ttl_schema_parts)
+        return self._commit_to_schema(ttl_schema)
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
-        return self.create_relationship_kinds(entity_kind_a, [relationship_kind], [entity_kind_b])
+        return self.create_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])
 
     def get_relationship(self, relationship_kind: str):
         relationship_details = []

@@ -20,6 +20,7 @@ neo_kg = Neo4jKnowledgeGraph(
         ontology_data_model_path=ONTOLOGY_DATA_MODEL_PATH,
         db_ids_file_path=DB_IDS_FILE_PATH,
     )
+start_time = datetime.datetime.now()
 
 neo_kg.drop_database()
 
@@ -56,18 +57,32 @@ neo_kg.get_entities_by_date(["Person/Sandy"], ts)
 
 # neo_kg.delete_entity("Person/Jack")
 
+print("Neo4j code took: ", datetime.datetime.now() - start_time, " sec")
+
+start_time = datetime.datetime.now()
 
 terminus_kg.drop_database()
 
-terminus_kg.ontology.create_entity_kind("Human")
-terminus_kg.ontology.create_entity_kind("Person", parent="Human")
-terminus_kg.ontology.create_entity_kind("Habit")
-terminus_kg.ontology.create_entity_kind("interest")
+terminus_kg.ontology.create_entity_kinds(
+    entity_kinds=[
+        "Human", "Person", "Habit"
+    ],
+    parents=[None, "Human", None]
+)
+terminus_kg.ontology.create_entity_kind("Interest")
+terminus_kg.ontology.create_property_kind("Person", "name", str)
+terminus_kg.ontology.create_property_kinds_of_entity_kinds(
+    entity_kinds=["Person", "Habit"],
+    property_kinds=[["height", "weight"], ["name"]],
+    property_types=[[int,       int],     [str]],
+)
 
-terminus_kg.ontology.create_property_kinds("Person", ["height", "name", "weight"], [int, str, int])
-terminus_kg.ontology.create_property_kinds("Habit", ["name"], [str])
-terminus_kg.ontology.create_relationship_kind("Person", "LIKES", "Habit")
-terminus_kg.ontology.create_relationship_kind("Person", "HATES", "Habit")
+terminus_kg.ontology.create_relationship_kinds(
+    entity_kinds_a=["Person", "Person"],
+    relationship_kinds=["LIKES", "HATES"],
+    entity_kinds_b=["Habit", "Habit"]
+)
+
 terminus_kg.create_entity("Person", "Person/Jack", ["name", "height",], ["Jack Ryan", 180])
 terminus_kg.create_entity("Habit", "Habit/Sport", ["name"], ["Sport"])
 terminus_kg.create_entity("Person", "Person/Sandy", ["name", "height"], ["Sandy Bates", 160])
@@ -92,5 +107,7 @@ terminus_kg.get_entities_by_date(["Person/Sandy"], ts)
 # terminus_kg.delete_properties_from_entities(["Person/Sandy", "Person/Jack"], ["height", "name"])
 
 # terminus_kg.delete_entity("Person/Jack")
+
+print("Terminusdb code took: ", datetime.datetime.now() - start_time, " sec")
 
 print("end")
