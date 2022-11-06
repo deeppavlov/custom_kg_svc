@@ -905,31 +905,100 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self._client.create_database(DB, team=TEAM)
         logging.info("Database was recreated successfully")
 
-    def create_entity(self, kind: str, entity_id: str, property_kinds: List[str], property_values: list):
+
+    def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
         """create an entity, or rewrite above it if it exists"""
-        return self._client.insert_document({
+        if len(entity_kinds) != len(entity_ids):
+            raise ValueError(f"Number of entity kinds should equal number of entity ids. Got: {len(entity_kinds)} kinds and {len(entity_ids)} ids")
+        entities = [{
             "@type": kind,
             "@id": entity_id,
-            **dict(zip(property_kinds, property_values)),
-        })
+        } for kind, entity_id in zip(entity_kinds, entity_ids)]
+        if property_kinds is not None and property_values is not None:
+            if not len(property_kinds) == len(property_values) == len(entity_ids):
+                raise ValueError("Number of property values lists should equal number of property kinds lists and equal to number of entity ids")
+            for entity, property_kinds_of_this_entity, property_values_of_this_entity in zip(entities, property_kinds, property_values):
+                entity.update(dict(zip(property_kinds_of_this_entity, property_values_of_this_entity)))
+        return self._client.insert_document(entities)
+
+
+    def create_entity(self, kind: str, entity_id: str, property_kinds: Optional[List[str]] = None, property_values: Optional[List[Any]] = None):
+        """create an entity, or rewrite above it if it exists"""
+        updated_properties = {
+            "@type": kind,
+            "@id": entity_id,
+        }
+        if property_kinds is not None and property_values is not None:
+            if len(property_values) != len(property_values):
+                raise ValueError("Number of property values should equal number of property kinds")
+            updated_properties.update(dict(zip(property_kinds, property_values)))
+        return self._client.insert_document(updated_properties)
 
     def delete_entity(self, entity_id: str):
         return self._client.delete_document({
             "@id": entity_id,
         })
 
-    def create_or_update_properties_of_entities(self, entity_ids: List[str], property_kinds: List[str], new_property_values: List[Any]):
-        for entity_id in entity_ids:
-            self.create_or_update_properties_of_entity(
-                entity_id, property_kinds, new_property_values
+    def create_or_update_properties_of_entities(self, entity_ids: List[str], property_kinds: List[List[str]], new_property_values: List[List[Any]]):
+        # TODO: check the relationship kind_b validation
+        entities1 = self.get_properties_of_entities(entity_ids)
+        entities1 = {entity.pop("@id"): entity for entity in entities1}
+        for entity_id, prop_kinds, prop_values in zip(entity_ids, property_kinds, new_property_values):
+            entities1[entity_id].update({prop_kind: prop_value for prop_kind, prop_value in zip(prop_kinds, prop_values)})
+        for k, entity in entities1.items():
+            entity.update({"@id":k})
+        entities = list(entities1.values())
+        # entities = []
+        # for id in entity_ids:
+        #     entities.append({**{"@id":id}, **entities1[id]})
+        # entity_kinds = [entity["@type"] for entity in entities]
+
+        # # check if property kinds are valid in the ontology graph 
+        # entity_kind_properties = {kind: properties for kind, properties in self.ontology.get_all_entity_kinds().items() if kind in entity_kinds}
+        # for entity_kind, prop_kinds in zip(entity_kinds, property_kinds):
+        #     allowed_props = entity_kind_properties[entity_kind]
+        #     for prop_kind in prop_kinds:
+        #         if prop_kind not in allowed_props:
+        #             raise ValueError(f"Property {prop_kind} should be in the ontology before adding a value to it in graph")
+
+        # data_dict = {}
+        # for entity_id, prop_kinds, prop_values in zip(entity_ids, property_kinds, new_property_values):
+        #     data_dict[entity_id] = (prop_kinds, prop_values)
+
+        # for entity in entities:
+        #     property_kinds, new_property_values = data_dict[entity["@id"]]
+        #     for idx, prop_kind in enumerate(property_kinds.copy()):
+        #         entity_props = self.ontology.get_entity_kind(entity["@type"])
+        #         # if prop_kind not in entity_props:
+        #         #     continue
+        #         # if it's a relationship
+        #         # TODO: Check if it's a set(terminus set), not if it's a relationship -> if @type == 'Set'
+        #         if (entity_props.get(prop_kind)["@type"] == "Set"
+        #             and prop_kind in entity):
+        #             entity[prop_kind].append(new_property_values[idx])
+        #             property_kinds.pop(idx)
+        #             new_property_values.pop(idx)
+
+        #     entity.update({
+        #             **dict(zip(property_kinds, new_property_values)),
+        #         })
+        try:
+            return self._client.update_document(entities)
+        except DatabaseError as e:
+            raise DatabaseError(
+                f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
+                Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
+                Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
+                """
             )
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
+        # TODO: check the relationship kind_b validation
         entity_kind = self.get_properties_of_entity(entity_id)["@type"]
         entity_kind_properties = self.ontology.get_entity_kind(entity_kind)
         for prop_kind in property_kinds:
             if prop_kind not in entity_kind_properties:
-                raise ValueError(f"Property {prop_kind} should be in the ontology before adding it to graph")
+                raise ValueError(f"Property {prop_kind} should be in the ontology before adding a value to it in graph")
         entity = self.get_properties_of_entity(entity_id)
 
         for idx, prop_kind in enumerate(property_kinds.copy()):
@@ -937,6 +1006,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             if prop_kind not in entity_props:
                 continue
             # if it's a relationship
+            # TODO: Check if it's a set, not if it's a relationship
             if (not entity_props.get(prop_kind)["@class"].startswith("xsd")
                and prop_kind in entity):
                 entity[prop_kind].append(new_property_values[idx])
@@ -975,8 +1045,19 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
     def get_all_entities(self):
         return self._client.get_all_documents(as_list=True)
 
+    def get_properties_of_entities(self, entity_ids: List[str]):
+        def take_id(elem):
+            return elem["@id"]
+        all_entities = self.get_all_entities()
+        return sorted([entity for entity in all_entities if entity["@id"] in entity_ids], key=take_id)
+
     def get_properties_of_entity(self, entity_id: str):
         return self._client.get_document(entity_id)
+
+    def create_relationships(self, ids_a: List[str], relationship_kinds: List[str], ids_b: List[str]):
+        lists_of_rel_kinds = [[rel] for rel in relationship_kinds]
+        lists_of_ids_b = [[id_b] for id_b in ids_b]
+        return self.create_or_update_properties_of_entities(ids_a, lists_of_rel_kinds, lists_of_ids_b)
 
     def create_relationship(self, id_a: str, relationship_kind: str, id_b: str):
         self.create_or_update_property_of_entity(id_a, relationship_kind, id_b)
@@ -1020,7 +1101,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         queries = [
                 WOQL().using(
                     path,
-                    WOQL().read_object(f"terminusdb:///data/{entity_id}", f"v:{entity_id}")
+                    WOQL().read_document(f"terminusdb:///data/{entity_id}", f"v:{entity_id}")
                 ) for entity_id in entity_ids
         ]
         query_result = self._client.query(WOQL().woql_and(*queries))

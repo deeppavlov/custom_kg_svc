@@ -192,27 +192,8 @@ class Neo4jOntologyConfig(OntologyConfig):
             )
             return False
 
-        valid = True
-        for (knd_a, knd_b, _) in data_model[relationship_kind]:
-            if (
-                (knd_a == kind_a and knd_b == kind_b)
-                or (knd_a == "All" and knd_b == kind_b)
-                or (knd_a == kind_a and knd_b == "All")
-                or (knd_a == "All" and knd_b == "All")
-            ):
-                valid = True
-                break
-            else:
-                logging.warning(
-                    "The relationship kind '%s' is not supoorted between entities of kinds (%s, %s)",
-                    relationship_kind,
-                    kind_a,
-                    kind_b,
-                )
-                valid=False
-                continue
-        if not valid:
-            return False
+        if [kind_a, kind_b] not in [rel[:2] for rel in data_model[relationship_kind]]:
+            raise ValueError(f"The relationship kind '{relationship_kind}' is not supoorted between entities of kinds ({kind_a}, {kind_b})")
 
         for (model_a, model_b, model_properties) in data_model[relationship_kind]:
             if (kind_a, kind_b) == (model_a, model_b):
