@@ -27,7 +27,7 @@ class OntologyConfig:
     def __init__(self,):
         raise NotImplementedError
 
-    def create_entity_kind(self, entity_kind: str):
+    def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         raise NotImplementedError
 
     def delete_entity_kind(self, entity_kind: str):
@@ -116,6 +116,9 @@ class Neo4jOntologyConfig(OntologyConfig):
             types_str.append(types.get(item))
         return types_str
 
+    def _node2dict(self, node: treelib.node.Node) -> dict:
+        return {"kind": node.tag, **node.data.properties}
+
     def _get_node_from_tree(self, tree: Optional[Tree], kind: str):
         """Searches tree for kind and returns the kind node
 
@@ -132,7 +135,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             return None
         return kind_node
 
-    def _are_valid_entity_kind_properties(
+    def _check_entity_kind_properties_validity(
         self,
         list_of_property_kinds: List[str],
         list_of_property_values: List[Any],
@@ -144,20 +147,18 @@ class Neo4jOntologyConfig(OntologyConfig):
         kind_properties = self.get_entity_kind(entity_kind)
         for idx, prop in enumerate(list_of_property_kinds):
             if prop not in kind_properties:
-                logging.error(
+                raise ValueError(
                     """The property '%s' isn't in '%s' properties in ontology graph.
                     Use create_properties_of_kind() function to add it""",
                     prop,
                     entity_kind,
                 )
-                return False
 
             property_type = kind_properties[prop]["type"]
             if str(type(list_of_property_values[idx])) != property_type:
-                logging.error(
+                raise ValueError(
                     "Property '%s' should be of type: '%s'", prop, property_type
                 )
-                return False
         return True
 
     def _is_valid_relationship_model(
@@ -221,17 +222,15 @@ class Neo4jOntologyConfig(OntologyConfig):
         self,
         kind: str,
         parent: str = "Kind",
-        start_tree: Optional[Tree] = None,
         kind_properties: Optional[List[str]] = None,
         kind_property_types: Optional[List[Type]] = None,
         kind_property_measurement_units: Optional[List[str]] = None,
-    ) -> Tree:
+    ) -> dict:
         """Adds a given kind to the ontology_kinds_hierarchy tree.
 
         Args:
           kind: kind to be added
           parent: parent of kind
-          start_tree: treelib.Tree object, to which the new kind should be added
           kind_properties: A set of properties for the created kind
           kind_property_types: A list of property types that correspond to items in
                                kind_properties respectively respectively by index
@@ -239,7 +238,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                                kind_properties respectively by index
 
         Returns:
-          tree object representing the ontology graph after the kind creation
+          entity kind properties
 
         """
         if kind_properties is None:
@@ -250,7 +249,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             kind_property_measurement_units = [""] * (len(kind_properties))
 
         if len(kind_property_types) != len(kind_property_measurement_units):
-            logging.error(
+            raise ValueError(
                 "Number of property types doesn't correspond properly with number of"
                 " property measurement_units. They should be equal"
             )
@@ -258,25 +257,23 @@ class Neo4jOntologyConfig(OntologyConfig):
         # kind = kind.capitalize()
         # parent = parent.capitalize()
 
-        if start_tree is None:
-            start_tree = self._load_ontology_kinds_hierarchy()
-            if start_tree is None:
-                start_tree = Tree()
-                start_tree.create_node(
-                    tag="Kind",
-                    identifier="Kind",
-                    data=Kind(
-                        {
-                            "_deleted": {"type": str(bool), "measurement_unit": ""},
-                        }
-                    ),
-                )
-        tree = start_tree
+        tree = self._load_ontology_kinds_hierarchy()
+        if tree is None:
+            tree = Tree()
+            tree.create_node(
+                tag="Kind",
+                identifier="Kind",
+                data=Kind(
+                    {
+                        "_deleted": {"type": str(bool), "measurement_unit": ""},
+                    }
+                ),
+            )
 
         parent_node = tree.get_node(parent)
         if parent_node is None:
-            tree = self.create_entity_kind(parent, "Kind", tree)
-            parent_node = tree.get_node(parent)
+            parent_node = self.create_entity_kind(parent, "Kind")
+            tree = self._load_ontology_kinds_hierarchy()
             logging.warning(
                 "Not-in-database kind '%s'. Has been added as a child of 'Kind'", parent
             )
@@ -304,7 +301,9 @@ class Neo4jOntologyConfig(OntologyConfig):
                 "The '%s' kind exists in database. No new kind has been created", kind
             )
 
-        return tree
+        kind_node = self._node2dict(tree.get_node(kind))
+        
+        return kind_node
 
     def delete_entity_kind(self, entity_kind: str):
         """Removes kind from database/ontology_kinds_hierarchy"""
@@ -336,7 +335,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         new_property_kinds: List[str],
         new_property_types: Optional[List[Type]] = None,
         # new_property_measurement_units: Optional[List[str]] = None,
-    ):
+    ) -> dict:
         """Creates a list of properties of a given kind
 
         Args:
@@ -388,7 +387,7 @@ class Neo4jOntologyConfig(OntologyConfig):
 
         self._save_ontology_kinds_hierarchy(tree)
         logging.info("Properties has been updated successfully")
-        return kind_node
+        return self._node2dict(kind_node)
 
     def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
         self.create_property_kinds(entity_kind, [property_kind], [property_type])
@@ -402,13 +401,14 @@ class Neo4jOntologyConfig(OntologyConfig):
                 if property_kind in kind_node.data.properties:
                     kind_node.data.properties.pop(property_kind)
                 else:
-                    logging.warning(f"The property:'{property_kind}' does not exist in ontology kinds hierarchy. "
-                                    "no property was deleted.")
+                    raise ValueError(f"The property:'{property_kind}' does not exist in ontology kinds hierarchy. "
+                                      "no property was deleted.")
 
             self._save_ontology_kinds_hierarchy(tree)
+            logging.info("Property kinds has been deleted successfully")
         else:
-            logging.warning(f"The ontology kinds hierarych is empty or the entity kind '{entity_kind}' doesn't exist. "
-                            "no property was deleted.")
+            raise ValueError(f"The ontology kinds hierarych is empty or the entity kind '{entity_kind}' doesn't exist. "
+                              "no property was deleted.")
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
         """Deletes property kind that relates to specific entity kind from the ontology"""
@@ -505,10 +505,11 @@ class Neo4jOntologyConfig(OntologyConfig):
                     if [entity_kind_a, entity_kind_b] == [relationship[0], relationship[1]]:
                         data_model[relationship_kind].pop(idx)
                 self._save_ontology_data_model(data_model)
+                logging.info("relationship kinds has been deleted successfully")
             else:
-                logging.warning("The given relationship doesn't exist. No relationship kind has been deleted")
+                raise ValueError("The given relationship doesn't exist. No relationship kind has been deleted")
         else:
-            logging.warning("The data model is empty. No relationship kind has been deleted")
+            raise ValueError("The data model is empty. No relationship kind has been deleted")
 
     # Extra
     def create_relationship_property_kinds(
@@ -561,7 +562,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                         }
             self._save_ontology_data_model(data_model)
         else:
-            logging.error(
+            raise ValueError(
                 "Relationship_kind '%s' is not in data model", relationship_kind
             )
         return data_model[relationship_kind]

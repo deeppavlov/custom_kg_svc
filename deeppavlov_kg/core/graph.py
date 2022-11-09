@@ -234,7 +234,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         else:
             return None
 
-    def _is_valid_relationship(
+    def _check_relationship_validity(
         self,
         id_a,
         relationship_kind,
@@ -246,45 +246,45 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if (a_node := self._get_entity_nodes([id_a])) is not None:
             kind_a = next(iter(a_node[0].labels))
         else:
-            logging.error(
-                """Id '%s' is not defined, in DB, relationship (%s,%s,%s) has not been created""",
-                id_a,
-                id_a,
-                relationship_kind,
-                id_b,
+            raise ValueError(
+                """Id '{}' is not defined, in DB, relationship ({},{},{}) has not been created""".format(
+                    id_a,
+                    id_a,
+                    relationship_kind,
+                    id_b,
+                )
             )
-            return False
         if (b_node := self._get_entity_nodes([id_b])) is not None:
             kind_b = next(iter(b_node[0].labels))
         else:
-            logging.error(
-                """Id '%s' is not defined in DB, relationship (%s,%s,%s) has not been created""",
-                id_b,
-                id_a,
-                relationship_kind,
-                id_b,
+            raise ValueError(
+                """Id '{}' is not defined in DB, relationship ({},{},{}) has not been created""".format(
+                    id_b,
+                    id_a,
+                    relationship_kind,
+                    id_b,
+                )
             )
-            return False
 
         if not self.ontology._is_valid_relationship_model(
             kind_a, relationship_kind, kind_b, rel_property_kinds, rel_property_values
         ):
             relationship_model = (kind_a, relationship_kind, kind_b)
-            logging.error(
-                """Relationship "(%s, %s, %s)" couldn't be created. "%s" is not a valid """
-                """relationship in ontology data model""",
-                id_a,
-                relationship_kind,
-                id_b,
-                relationship_model,
+            raise ValueError(
+                """Relationship "({},{},{})" couldn't be created. "{}" is not a valid """
+                """relationship in ontology data model""".format(
+                    id_a,
+                    relationship_kind,
+                    id_b,
+                    relationship_model,
+                )
             )
-            return False
         return True
 
     def drop_database(
         self,
     ):
-        """Clears database."""
+        """Clears database ontology graph as well as knowledge graph."""
         clear_neo4j_database(db)
 
         ontology_kinds_hierarchy = self.ontology.ontology_kinds_hierarchy_path
@@ -306,8 +306,8 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         property_kinds: List[str],
         property_values: list,
         create_date: Optional[datetime.datetime] = None,
-    ):
-        """Creates new entity.
+    ) -> Optional[dict]:
+        """Creates new entity into KG.
 
         Args:
           kind: entity kind
@@ -320,43 +320,38 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
           created entity in case of success, None otherwise
         """
         if len(property_kinds) != len(property_values):
-            logging.error(
+            raise ValueError(
                 "Number of property kinds doesn't correspond properly with number of property "
                 "values. Should be equal"
             )
-            return None
         if create_date is None:
             create_date = datetime.datetime.now()
         if not self._is_identical_id(entity_id):
-            logging.error("The same id exists in database")
-            return None
+            raise ValueError("The same id exists in database")
+
         property_kinds.append("_deleted")
         property_values.append(False)
 
-        if not self.ontology._are_valid_entity_kind_properties(
+        self.ontology._check_entity_kind_properties_validity(
             property_kinds,
             property_values,
             entity_kind=kind,
-        ):
-            return None
+        )
+
         immutable_properties = {"Id": entity_id}
+        mutable_properties = dict(zip(property_kinds, property_values))
         query, params = querymaker.init_entity_query(
             kind,
             immutable_properties,
-            dict(zip(property_kinds, property_values)),
+            mutable_properties,
             create_date,
         )
         return_query = querymaker.return_nodes_or_relationships_query(["node"])
         query = "\n".join([query, return_query])
 
-        nodes, _ = db.cypher_query(query, params)
+        db.cypher_query(query, params)
         self._store_id(entity_id)
-
-        if nodes:
-            [[entity]] = nodes
-            return entity
-        else:
-            return None
+        return {**immutable_properties, **mutable_properties}
 
     def delete_entity(
         self,
@@ -370,15 +365,13 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
           deletion_date: the date of entity deletion
 
         Returns:
-          In case of error: None.
-          In case of success: State node
+          Entity properties after marking it as deleted
 
         """
         if deletion_date is None:
             deletion_date = datetime.datetime.now()
         if not self._get_entity_nodes([entity_id]):
-            logging.error("No such a node to be deleted")
-            return None
+            raise ValueError("No such a node to be deleted")
 
         return self.create_or_update_property_of_entity(
             entity_id, "_deleted", True, deletion_date
@@ -390,44 +383,41 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         property_kinds: List[str],
         new_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
-    ):
-        """Updates and Adds a batch of properties of a batch of entities.
+    ) -> Optional[List[dict]]:
+        """Updates and Adds a batch of properties to a batch of entities.
 
         Args:
-          entity_ids: entities ids
+          entity_ids: ids of entity, to which we want to add properties 
           property_kinds: properties kinds to be updated or added
           new_property_values: properties values that correspond respectively to property_kinds
           change_date: the date of entities updating
 
         Returns:
-          State nodes in case of success or None in case of error.
+          All entity properties after updates in case of success or None in case of failure.
         """
         if len(property_kinds) != len(new_property_values):
-            logging.error(
+            raise ValueError(
                 "Number of property kinds don't correspont properly with number of property "
                 "values. Should be equal"
             )
-            return None
 
         entities = self._get_entity_nodes(entity_ids)
         if entities:
             for entity in entities:
                 kinds_frozenset = entity.labels
                 entity_kind = next(iter(kinds_frozenset))
-                if not self.ontology._are_valid_entity_kind_properties(
+                self.ontology._check_entity_kind_properties_validity(
                     property_kinds,
                     new_property_values,
                     entity_kind,
-                ):
-                    return None
+                )
 
         for id_ in entity_ids:
             entity = self._get_entity_nodes([id_])
             if not entity:
-                logging.error(
+                raise ValueError(
                     "Node with Id %s is not in database\nNothing has been updated", id_
                 )
-                return None
         if change_date is None:
             change_date = datetime.datetime.now()
         updates = dict(zip(property_kinds, new_property_values))
@@ -446,7 +436,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         nodes, _ = db.cypher_query(query, params)
 
         if nodes:
-            return nodes
+            return [dict(node.items()) for [node] in nodes]
         else:
             logging.warning("No node has been updated")
             return None
@@ -457,7 +447,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         property_kinds: List[str],
         new_property_values: List[Any],
         change_date: Optional[datetime.datetime] = None,
-    ):
+    ) -> Optional[dict]:
         """Updates and Adds a batch of properties of a single entity.
 
         Args:
@@ -467,14 +457,14 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
           change_date: the date of entity updating
 
         Returns:
-          State node in case of success or None in case of error.
+          Entity properties after updates in case of success or None in case of failure
 
         """
         nodes = self.create_or_update_properties_of_entities(
             [entity_id], property_kinds, new_property_values, change_date
         )
         if nodes:
-            [[node]] = nodes
+            [node] = nodes
             return node
         else:
             return None
@@ -485,7 +475,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         property_kind: str,
         property_value: Any,
         change_date: Optional[datetime.datetime] = None,
-    ):
+    ) -> Optional[dict]:
         """Updates a single property of a given entity.
 
         Args:
@@ -495,14 +485,14 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
           change_date: the date of entity updating
 
         Returns:
-          State node in case of success or None in case of error.
+          Entity properties after updates in case of success or None in case of failure
 
         """
         nodes = self.create_or_update_properties_of_entities(
             [entity_kind], [property_kind], [property_value], change_date
         )
         if nodes:
-            [[node]] = nodes
+            [node] = nodes
             return node
         else:
             return None
@@ -515,7 +505,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         entity_id: str,
         property_kinds: List[str],
         change_date: Optional[datetime.datetime] = None,
-    ):
+    ) -> dict:
         """Removes a batch of properties from a given entity.
 
         Args:
@@ -524,25 +514,22 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
            change_date: the date of node updating
 
         Returns:
-          State node in case of success or None in case of error.
+          Entity properties after deletion
         """
         current_state = self._get_current_state_node(entity_id)
         if current_state is None:
-            logging.warning(
-                "No property was removed. No entity with specified id was found"
+            raise ValueError(
+                "No entity with specified id was found. No property was removed."
             )
-            return None
         if change_date is None:
             change_date = datetime.datetime.now()
 
         self._create_new_state(entity_id, change_date)
         new_current_state = self._get_current_state_node(entity_id)
-        if new_current_state is None:
-            return None
 
         match_state, id_updated = querymaker.match_node_query("state", "State")
         where_state = querymaker.where_internal_id_equal_to(
-            ["state"], [new_current_state.id]
+            ["state"], [new_current_state.id] #type: ignore
         )
         remove_state = querymaker.remove_properties_query("state", property_kinds)
         return_state = querymaker.return_nodes_or_relationships_query(["state"])
@@ -550,7 +537,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         query = "\n".join([match_state, where_state, remove_state, return_state])
 
         [[node]], _ = db.cypher_query(query, id_updated)
-        return node
+        return dict(node.items())
 
     def delete_property_from_entity(self, entity_id: str, property_kind: str):
         """Removes a property from a given entity.
@@ -560,11 +547,11 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
            property_kind: property kind to be removed
 
         Returns:
-          State node in case of success or None in case of error.
+          Entity properties after deletion
         """
         return self.delete_properties_from_entity(entity_id, [property_kind])
 
-    def get_all_entities(self):
+    def get_all_entities(self) -> List[dict]:
         """Returns all entities in the database with their properties."""
         all_entity_ids = []
         properties_of_all_entities = []
@@ -578,7 +565,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             properties_of_all_entities.append(entity_props)
         return properties_of_all_entities
 
-    def get_properties_of_entity(self, entity_id: str):
+    def get_properties_of_entity(self, entity_id: str) -> dict:
         """Returns properties of an entity"""
         return dict(self._get_current_state_node(entity_id).items())
 
@@ -590,7 +577,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         rel_property_kinds: Optional[List[str]] = None,
         rel_property_values: Optional[List[Any]] = None,
         create_date: Optional[datetime.datetime] = None,
-    ) -> Optional[neo4j_graph.Relationship]:
+    ) -> dict:
         """Finds entities A and B and set a relationship between them.
 
         Direction is from entity A to entity B.
@@ -604,7 +591,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
           create_date: relationship creation date
 
         Returns:
-            neo4j relationship object in case of success or None in case of error
+            relationship properties
 
         """
         if rel_property_kinds is None:
@@ -612,10 +599,9 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if rel_property_values is None:
             rel_property_values = []
 
-        if not self._is_valid_relationship(
+        self._check_relationship_validity(
             id_a, relationship_kind, id_b, rel_property_kinds, rel_property_values
-        ):
-            return None
+        )
 
         rel_property_kinds.append("_deleted")
         rel_property_values.append(False)
@@ -640,12 +626,12 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             relationship, _ = db.cypher_query(query, params)
             [[relationship]] = relationship
         except ClientError as exc:
-            logging.error(
-                "No new relationship has been created.\nRaised error: %r\n"
-                "It could be because the relationship you're trying to create is already in database",
-                exc,
+            raise Exception(
+                "No new relationship has been created."
+                "It could be because the relationship you're trying to create is already in database. Raised error: {}".format(exc)
             )
-            return None
+        
+        relationship = {"type":relationship.type, **dict(relationship.items())}
         return relationship
 
     def search_for_relationships(
@@ -659,9 +645,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         limit=10,
         return_query_instead_of_relationships: bool = False,
         search_all_states=False,
-    ) -> Union[
-        List[List[Union[neo4j_graph.Node, neo4j_graph.Relationship]]], Tuple[str, dict]
-    ]:
+    ) -> List[dict]:
         """Searches existing relationships.
 
         Args:
@@ -676,7 +660,8 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
                       True for returning (query, params) of that relationship matching.
 
         Returns:
-          neo4j relationships list
+          list of relationships, each of them has versioner relationship members
+          ["entity_a_node", "entity_state_relationship", "state_node", "r_node", "entity_b_node"]
 
         """
         if rel_properties_filter is None:
@@ -722,6 +707,13 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             return query, params
 
         rels, _ = db.cypher_query(query, params)
+        rels = [{
+            "entity_a_node": rel[0],
+            "entity_state_relationship": rel[1],
+            "state_node": rel[2],
+            "r_node": rel[3],
+            "entity_b_node": rel[4]
+        } for rel in rels]
         return rels
 
     # Extra
@@ -754,14 +746,13 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if updated_property_values is None:
             updated_property_values = []
 
-        if not self._is_valid_relationship(
+        self._check_relationship_validity(
             id_a,
             relationship_kind,
             id_b,
             updated_property_kinds,
             updated_property_values,
-        ):
-            return None
+        )
 
         self._create_new_state(id_a, change_date)
 
