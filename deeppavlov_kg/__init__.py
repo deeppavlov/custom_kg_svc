@@ -1,3 +1,3 @@
-from deeppavlov_kg.core.graph import KnowledgeGraph
+from deeppavlov_kg.core.graph import Neo4jKnowledgeGraph, TerminusdbKnowledgeGraph
 
-__all__ = ["KnowledgeGraph"]
+__all__ = ["Neo4jKnowledgeGraph", "TerminusdbKnowledgeGraph"]
