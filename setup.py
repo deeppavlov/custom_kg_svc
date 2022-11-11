@@ -6,15 +6,8 @@ authors = [
     "Maxim Talimanchuk <mtalimanchuk@gmail.com>",
 ]
 
-install_requires = [
-    "neomodel==4.0.8",
-    "pydantic[dotenv]==1.9.0",
-    "fabulist==1.2.0",
-    "mimesis==5.3.0",
-    "pylint==2.13.8",
-    "treelib==1.6.1",
-    "terminusdb_client @ git+https://github.com/terminusdb/terminusdb-client-python.git@fdb9a73#egg=terminusdb_client",
-]
+with open("requirements.txt", "r", encoding="utf-8") as req_f:
+    install_requires = [line.strip() for line in req_f if line.strip()]
 
 setup(
     name="deeppavlov-kg",
