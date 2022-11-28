@@ -932,47 +932,13 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
 
     def create_or_update_properties_of_entities(self, entity_ids: List[str], property_kinds: List[List[str]], new_property_values: List[List[Any]]):
         # TODO: check the relationship kind_b validation
-        entities1 = self.get_properties_of_entities(entity_ids)
-        entities1 = {entity.pop("@id"): entity for entity in entities1}
+        entities = self.get_properties_of_entities(entity_ids)
+        entities_dict = {entity.pop("@id"): entity for entity in entities}
         for entity_id, prop_kinds, prop_values in zip(entity_ids, property_kinds, new_property_values):
-            entities1[entity_id].update({prop_kind: prop_value for prop_kind, prop_value in zip(prop_kinds, prop_values)})
-        for k, entity in entities1.items():
+            entities_dict[entity_id].update({prop_kind: prop_value for prop_kind, prop_value in zip(prop_kinds, prop_values)})
+        for k, entity in entities_dict.items():
             entity.update({"@id":k})
-        entities = list(entities1.values())
-        # entities = []
-        # for id in entity_ids:
-        #     entities.append({**{"@id":id}, **entities1[id]})
-        # entity_kinds = [entity["@type"] for entity in entities]
-
-        # # check if property kinds are valid in the ontology graph 
-        # entity_kind_properties = {kind: properties for kind, properties in self.ontology.get_all_entity_kinds().items() if kind in entity_kinds}
-        # for entity_kind, prop_kinds in zip(entity_kinds, property_kinds):
-        #     allowed_props = entity_kind_properties[entity_kind]
-        #     for prop_kind in prop_kinds:
-        #         if prop_kind not in allowed_props:
-        #             raise ValueError(f"Property {prop_kind} should be in the ontology before adding a value to it in graph")
-
-        # data_dict = {}
-        # for entity_id, prop_kinds, prop_values in zip(entity_ids, property_kinds, new_property_values):
-        #     data_dict[entity_id] = (prop_kinds, prop_values)
-
-        # for entity in entities:
-        #     property_kinds, new_property_values = data_dict[entity["@id"]]
-        #     for idx, prop_kind in enumerate(property_kinds.copy()):
-        #         entity_props = self.ontology.get_entity_kind(entity["@type"])
-        #         # if prop_kind not in entity_props:
-        #         #     continue
-        #         # if it's a relationship
-        #         # TODO: Check if it's a set(terminus set), not if it's a relationship -> if @type == 'Set'
-        #         if (entity_props.get(prop_kind)["@type"] == "Set"
-        #             and prop_kind in entity):
-        #             entity[prop_kind].append(new_property_values[idx])
-        #             property_kinds.pop(idx)
-        #             new_property_values.pop(idx)
-
-        #     entity.update({
-        #             **dict(zip(property_kinds, new_property_values)),
-        #         })
+        entities = list(entities_dict.values())
         try:
             return self._client.update_document(entities)
         except DatabaseError as e:
@@ -984,38 +950,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             )
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
-        # TODO: check the relationship kind_b validation
-        entity_kind = self.get_properties_of_entity(entity_id)["@type"]
-        entity_kind_properties = self.ontology.get_entity_kind(entity_kind)
-        for prop_kind in property_kinds:
-            if prop_kind not in entity_kind_properties:
-                raise ValueError(f"Property {prop_kind} should be in the ontology before adding a value to it in graph")
-        entity = self.get_properties_of_entity(entity_id)
-
-        for idx, prop_kind in enumerate(property_kinds.copy()):
-            entity_props = self.ontology.get_entity_kind(entity["@type"])
-            if prop_kind not in entity_props:
-                continue
-            # if it's a relationship
-            # TODO: Check if it's a set, not if it's a relationship
-            if (not entity_props.get(prop_kind)["@class"].startswith("xsd")
-               and prop_kind in entity):
-                entity[prop_kind].append(new_property_values[idx])
-                property_kinds.pop(idx)
-                new_property_values.pop(idx)
-
-        entity.update({
-                **dict(zip(property_kinds, new_property_values)),
-            })
-        try:
-            return self._client.update_document(entity)
-        except DatabaseError as e:
-            raise DatabaseError(
-                f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
-                Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
-                Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
-                """
-            )
+        return self.create_or_update_properties_of_entities([entity_id], [property_kinds], [new_property_values])
     
     def create_or_update_property_of_entity(self, entity_id: str, property_kind: str, new_property_value: Any):
         return self.create_or_update_properties_of_entity(entity_id, [property_kind], [new_property_value])
