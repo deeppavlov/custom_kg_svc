@@ -966,7 +966,9 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])
 
-    def get_relationship(self, relationship_kind: str):
+    def get_relationship_kind(self, relationship_kind: str):
+        if relationship_kind.startswith("@"):
+            raise ValueError(f"'{relationship_kind}' is not a relationship kind")
         relationship_details = []
         for entity_kind, props in self.get_all_entity_kinds().items():
             if relationship_kind in props:
