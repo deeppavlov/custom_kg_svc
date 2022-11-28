@@ -69,6 +69,9 @@ class KnowledgeGraph:
     def drop_database(self):
         raise NotImplementedError
 
+    def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
+        raise NotImplementedError
+
     def create_entity(self, kind: str, entity_id: str, property_kinds: List[str], property_values: list):
         raise NotImplementedError
 
@@ -96,7 +99,13 @@ class KnowledgeGraph:
     def get_all_entities(self):
         raise NotImplementedError
 
+    def get_properties_of_entities(self, entity_ids: List[str]):
+        raise NotImplementedError
+
     def get_properties_of_entity(self, entity_id: str):
+        raise NotImplementedError
+
+    def create_relationships(self, ids_a: List[str], relationship_kinds: List[str], ids_b: List[str]):
         raise NotImplementedError
 
     def create_relationship(self, id_a: str, relationship_kind: str, id_b: str):
@@ -111,6 +120,12 @@ class KnowledgeGraph:
         raise NotImplementedError
 
     def delete_relationship(self, id_a: str, relationship_kind: str, id_b: str):
+        raise NotImplementedError
+
+    def get_relationships_of_entities(self, entity_ids: List[str]) -> List[dict]:
+        raise NotImplementedError
+
+    def get_relationships_of_entity(self, entity_id: str) -> List[dict]:
         raise NotImplementedError
 
     def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
@@ -890,6 +905,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self.ontology = TerminusdbOntologyConfig(self._client)
 
     def drop_database(self):
+        """Clears the database from ontology and knowledge graphs."""
         DB = self._client.db
         TEAM = self._client.team
         self._client.delete_database(DB, team=TEAM)
@@ -1023,7 +1039,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         for entity_properties in properties:
             for prop in entity_properties:
                 if not prop.startswith("@"): # if a custom property
-                    relationship = self.ontology.get_relationship(prop)
+                    relationship = self.ontology.get_relationship_kind(prop)
                     if not relationship[0][1].startswith("xsd:"): # if a relationship
                         relationships.append((prop, entity_properties[prop]))
         return relationships

@@ -27,6 +27,9 @@ class OntologyConfig:
     def __init__(self,):
         raise NotImplementedError
 
+    def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
+        raise NotImplementedError
+
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         raise NotImplementedError
 
@@ -39,10 +42,18 @@ class OntologyConfig:
     def get_entity_kind(self, entity_kind: str):
         raise NotImplementedError
 
-    def create_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], property_types: Optional[List[Type]]= None):
+    def create_property_kinds_of_entity_kinds(
+            self,
+            entity_kinds: List[str],
+            property_kinds: List[List[str]],
+            property_types: Optional[List[List[Type]]]= None
+        ):
         raise NotImplementedError
 
-    def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
+    def create_property_kinds_of_entity_kind(self, entity_kinds: List[str], property_kinds: List[str], property_types: Optional[List[Type]]= None):
+        raise NotImplementedError
+
+    def create_property_kind_of_entity_kind(self, entity_kind: str, property_kind: str, property_type: Type):
         raise NotImplementedError
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
@@ -57,7 +68,10 @@ class OntologyConfig:
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         raise NotImplementedError
 
-    def get_relationship(self, relationship_kind: str):
+    def get_relationship_kind(self, relationship_kind: str):
+        raise NotImplementedError
+
+    def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str], entity_kinds_b: List[str]):
         raise NotImplementedError
 
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
@@ -218,6 +232,9 @@ class Neo4jOntologyConfig(OntologyConfig):
                             return False
         return True
 
+    def create_entity_kinds(self):
+        raise NotImplementedError
+
     def create_entity_kind(
         self,
         kind: str,
@@ -329,11 +346,19 @@ class Neo4jOntologyConfig(OntologyConfig):
             return kind_node.data.properties
         return dict()
 
-    def create_property_kinds(
+    def create_property_kinds_of_entity_kinds(
+            self,
+            entity_kinds: List[str],
+            property_kinds: List[List[str]],
+            property_types: Optional[List[List[Type]]]= None
+        ):
+        raise NotImplementedError
+
+    def create_property_kinds_of_entity_kind(
         self,
         kind: str,
-        new_property_kinds: List[str],
-        new_property_types: Optional[List[Type]] = None,
+        property_kinds: List[str],
+        property_types: Optional[List[Type]] = None,
         # new_property_measurement_units: Optional[List[str]] = None,
     ) -> dict:
         """Creates a list of properties of a given kind
@@ -389,8 +414,8 @@ class Neo4jOntologyConfig(OntologyConfig):
         logging.info("Properties has been updated successfully")
         return self._node2dict(kind_node)
 
-    def create_property_kind(self, entity_kind: str, property_kind: str, property_type: Type):
-        self.create_property_kinds(entity_kind, [property_kind], [property_type])
+    def create_property_kind_of_entity_kind(self, entity_kind: str, property_kind: str, property_type: Type):
+        self.create_property_kinds_of_entity_kind(entity_kind, [property_kind], [property_type])
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         """Deletes property kinds that relate to specific entity kind from the ontology"""
@@ -488,7 +513,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             entity_kind_b,
         )
 
-    def get_relationship(self, relationship_kind: str):
+    def get_relationship_kind(self, relationship_kind: str):
         """Returns the relationship two-possible-parties as well as its properties."""
         data_model = self._load_ontology_data_model()
         if data_model is not None:
@@ -496,6 +521,9 @@ class Neo4jOntologyConfig(OntologyConfig):
             return kind
         else:
             return None
+
+    def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str], entity_kinds_b: List[str]):
+        raise NotImplementedError
 
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         data_model = self._load_ontology_data_model()
@@ -601,6 +629,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         for relationship_kind in data_model:
             for kind_a, kind_b, properties in data_model[relationship_kind]:
                 print(f"({kind_a})-[{relationship_kind} [{properties}]]->({kind_b})")
+
 
 # no need for update function, just use delete and create, because anyway you can't update/delete
 # while there're docs in the database
@@ -905,7 +934,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         ttl_schema = "\n".join(ttl_schema_parts)
         return self._commit_to_schema(ttl_schema)
 
-    def create_property_kinds_of_one_entity_kind(
+    def create_property_kinds_of_entity_kind(
         self,
         entity_kind: str,
         property_kinds: List[str],
@@ -919,7 +948,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             [properties_type_families],
         )
 
-    def create_property_kind(
+    def create_property_kind_of_entity_kind(
         self,
         entity_kind: str,
         property_kind: str,
