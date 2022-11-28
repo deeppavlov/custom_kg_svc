@@ -864,10 +864,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
             logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
 
     def get_all_entity_kinds(self):
+        """Returns all entity kinds with their direct properties in addition to the parent classes if exist"""
         return self._client.get_existing_classes()
 
     def get_entity_kind(self, entity_kind: str):
-        return self.get_all_entity_kinds().get(entity_kind)
+        """Returns entity kind direct properties as well as inherited ones from parents"""
+        return self._client.get_class_frame(entity_kind)
 
     def create_property_kinds_of_entity_kinds(
         self,
