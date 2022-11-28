@@ -989,7 +989,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self.create_or_update_property_of_entity(id_a, relationship_kind, id_b)
 
     # TODO: you can discuss the case of relationship_kind is None to search for rels between a and b, rels from a, or rels to b
-    def search_for_relationships(
+    def search_for_relationships_or_properties(
         self,
         relationship_kind: str,
         id_a: Optional[str] = None,
@@ -1016,6 +1016,20 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
 
     def delete_relationship(self, id_a: str, relationship_kind: str, id_b: Optional[str] = None):
         return self.create_or_update_property_of_entity(id_a, relationship_kind, None)
+
+    def get_relationships_of_entities(self, entity_ids: List[str]) -> List[dict]:
+        properties = self.get_properties_of_entities(entity_ids)
+        relationships = []
+        for entity_properties in properties:
+            for prop in entity_properties:
+                if not prop.startswith("@"): # if a custom property
+                    relationship = self.ontology.get_relationship(prop)
+                    if not relationship[0][1].startswith("xsd:"): # if a relationship
+                        relationships.append((prop, entity_properties[prop]))
+        return relationships
+
+    def get_relationships_of_entity(self, entity_id: str) -> List[dict]:
+        return self.get_relationships_of_entities([entity_id])
 
     def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
         history = self._client.get_commit_history()
