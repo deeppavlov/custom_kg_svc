@@ -12,7 +12,7 @@ with open("requirements.txt", "r", encoding="utf-8") as req_f:
 setup(
     name="deeppavlov-kg",
     author=", ".join(authors),
-    version="0.0.1",
+    version="0.1.1",
     packages=find_packages(),
     include_package_data=True,
     install_requires=install_requires,
