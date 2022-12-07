@@ -334,8 +334,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         Returns:
           created entity in case of success, None otherwise
         """
-        if len(property_kinds) != len(property_values):
-            raise ValueError(
+        assert len(property_kinds) == len(property_values), (
                 "Number of property kinds doesn't correspond properly with number of property "
                 "values. Should be equal"
             )
@@ -410,8 +409,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         Returns:
           All entity properties after updates in case of success or None in case of failure.
         """
-        if len(property_kinds) != len(new_property_values):
-            raise ValueError(
+        assert len(property_kinds) == len(new_property_values), (
                 "Number of property kinds don't correspont properly with number of property "
                 "values. Should be equal"
             )
@@ -915,15 +913,17 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
 
     def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
         """create an entity, or rewrite above it if it exists"""
-        if len(entity_kinds) != len(entity_ids):
-            raise ValueError(f"Number of entity kinds should equal number of entity ids. Got: {len(entity_kinds)} kinds and {len(entity_ids)} ids")
+        assert len(entity_kinds) == len(entity_ids), (
+            f"Number of entity kinds should equal number of entity ids. Got: {len(entity_kinds)} kinds and {len(entity_ids)} ids"
+        )
         entities = [{
             "@type": kind,
             "@id": entity_id,
         } for kind, entity_id in zip(entity_kinds, entity_ids)]
         if property_kinds is not None and property_values is not None:
-            if not len(property_kinds) == len(property_values) == len(entity_ids):
-                raise ValueError("Number of property values lists should equal number of property kinds lists and equal to number of entity ids")
+            assert len(property_kinds) == len(property_values) == len(entity_ids), (
+                "Number of property values lists should equal number of property kinds lists and equal to number of entity ids"
+            )
             for entity, property_kinds_of_this_entity, property_values_of_this_entity in zip(entities, property_kinds, property_values):
                 entity.update(dict(zip(property_kinds_of_this_entity, property_values_of_this_entity)))
         return self._client.insert_document(entities)
@@ -936,8 +936,9 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             "@id": entity_id,
         }
         if property_kinds is not None and property_values is not None:
-            if len(property_values) != len(property_values):
-                raise ValueError("Number of property values should equal number of property kinds")
+            assert len(property_kinds) == len(property_values), (
+                "Number of property values should equal number of property kinds"
+            )
             updated_properties.update(dict(zip(property_kinds, property_values)))
         return self._client.insert_document(updated_properties)
 

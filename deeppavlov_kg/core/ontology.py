@@ -265,8 +265,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         if kind_property_measurement_units is None:
             kind_property_measurement_units = [""] * (len(kind_properties))
 
-        if len(kind_property_types) != len(kind_property_measurement_units):
-            raise ValueError(
+        assert len(kind_property_types) == len(kind_property_measurement_units), (
                 "Number of property types doesn't correspond properly with number of"
                 " property measurement_units. They should be equal"
             )
@@ -379,16 +378,14 @@ class Neo4jOntologyConfig(OntologyConfig):
         # if new_property_measurement_units is None:
         #     new_property_measurement_units = [""] * len(new_property_kinds)
 
-        if not (
+        assert (
             len(new_property_kinds)
             == len(new_property_types)
             # == len(new_property_measurement_units)
-        ):
-            logging.error(
+        ), (
                 "Number of new property kinds doesn't correspond properly with number of "
                 "new property types or measurement_units. All should be equal"
             )
-            return None
 
         tree = self._load_ontology_kinds_hierarchy()
         if tree is None:
@@ -565,16 +562,14 @@ class Neo4jOntologyConfig(OntologyConfig):
         # if new_property_measurement_units is None:
         #     new_property_measurement_units = [""] * len(new_property_kinds)
 
-        if not (
+        assert (
             len(new_property_kinds)
             == len(new_property_types)
             # == len(new_property_measurement_units)
-        ):
-            logging.error(
+        ), (
                 "Number of new properties kinds doesn't correspond properly with number of "
                 "new property kinds or values. All should be equal"
             )
-            return None
 
         data_model = self._load_ontology_data_model()
         if data_model is None:
@@ -680,8 +675,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
         if property_kinds is not None:
             if property_types is not None:
-                if len(property_types) != len(property_kinds):
-                    logging.error(
+                assert len(property_types) == len(property_kinds), (
                         "Number of property types doesn't correspond properly with number of"
                         " property kinds. They should be equal"
                     )
@@ -692,8 +686,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 property_types = TerminusdbOntologyConfig._type2str(property_types)
             
             if properties_type_families is not None:
-                if len(properties_type_families) != len(property_kinds):
-                    logging.error(
+                assert len(properties_type_families) == len(property_kinds), (
                         "Number of property type families doesn't correspond properly with number of"
                         " property kinds. They should be equal"
                     )
