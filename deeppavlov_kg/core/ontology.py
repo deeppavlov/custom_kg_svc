@@ -868,7 +868,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return self._commit_to_schema(ttl_schema)
 
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
-        return self._create_or_update_schema(entity_kind, parent)
+        return self.create_entity_kinds([entity_kind], [parent])
 
     def delete_entity_kind(self, entity_kind: str):
         ttl_schema = self._get_schema()
