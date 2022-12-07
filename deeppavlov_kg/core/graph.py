@@ -955,15 +955,15 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         for k, entity in entities_dict.items():
             entity.update({"@id":k})
         entities = list(entities_dict.values())
-        try:
-            return self._client.update_document(entities)
-        except DatabaseError as e:
-            raise DatabaseError(
-                f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
-                Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
-                Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
-                """
-            )
+        # try:
+        return self._client.update_document(entities)
+        # except DatabaseError as e:
+        #     raise DatabaseError(
+        #         f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
+        #         Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
+        #         Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
+        #         """
+        #     )
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
         return self.create_or_update_properties_of_entities([entity_id], [property_kinds], [new_property_values])
