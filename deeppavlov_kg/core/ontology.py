@@ -801,12 +801,14 @@ class TerminusdbOntologyConfig(OntologyConfig):
         instructions = ttl_schema.split(" .")
         new_instructions = []
         for instruction in instructions:
+            add_instruction=True
             for property_kind in property_kinds:
                 # delete definition
                 if (
                     f"<schema#{entity_kind}/{property_kind}/" in instruction 
                     and "a sys:Class" not in instruction
                 ):
+                    add_instruction=False
                     continue
                 # delete mention
                 elif f"<schema#{entity_kind}>" in instruction and "a sys:Class" in instruction:
@@ -817,8 +819,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     #         instruction = "".join(re.split(pattern_of_rel_with_kind_b, instruction))
                     # else: # if "All" and this's relationship, it will delete relationships between entity_kind and all existing entity_kind_b. if a property, then it'll delete every mention of this property.
                     prop_definition_pattern = f"<schema#{property_kind}>.*;"
+                    if not instruction.endswith(";"):
+                        instruction = "".join([instruction, ";"])
                     instruction = "".join(re.split(prop_definition_pattern, instruction))
-                new_instructions.append(instruction)
+            if not add_instruction:
+                continue
+            new_instructions.append(instruction)
         ttl_schema = ".".join(new_instructions)
 
         try:
@@ -1007,7 +1013,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return relationship_details
 
     def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str]):
-        self._delete_from_schema(entity_kind_a, relationship_kinds)
+        return self.delete_property_kinds(entity_kind_a, relationship_kinds)
 
     def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str):
         return self.delete_relationship_kinds(entity_kind_a, [relationship_kind])
