@@ -1005,6 +1005,19 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 relationship_details.append((entity_kind, props[relationship_kind]["@class"]))
         return relationship_details
 
+    def get_relationship_kinds_by_label(self, label: str) -> List[dict]:
+        kind_b = {'@type': 'xsd:string', '@value': label}
+        query = WOQL().quad("v:kind_a", "v:rel", "v:kind_b", "schema") + WOQL().quad("v:props_with_labels", "v:rel", kind_b, "schema")
+        results = query.execute(self._client)
+        relationships = [triple for triple in results["bindings"] if "documentation" not in triple["kind_a"]]
+        for relationship in relationships:
+            relationship["kind_a"] = relationship["kind_a"].split(":")[-1]
+            relationship["rel"] = relationship["rel"].split(":")[-1]
+            relationship["kind_b"] = relationship["kind_b"].split("+")[-1]
+            relationship.pop("props_with_labels")
+        relationships = [dict(triple) for triple in {tuple(relationship.items()) for relationship in relationships}] # to delete duplicates
+        return relationships
+
     def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str]):
         return self.delete_property_kinds(entity_kind_a, relationship_kinds)
 
