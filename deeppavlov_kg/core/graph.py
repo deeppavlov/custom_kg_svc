@@ -879,27 +879,41 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self,
         team: str,
         db_name: str,
+        server: Optional[str] = None,
         local: bool = False,
         username: str = "admin",
         password: str = "root",
     ):
+        """
+            Connecting to cloud doesn't need a password, just make sure you export your token or add it to '.env' file
+            Connecting to a server make sure you enter the password to your server
+            Connecting to localhost, you need nothing if you didn't change the username and password
+        """
         self._team = team
         self._db = db_name
-        if local:
-            self._client = WOQLClient("http://localhost:6363", account=username, team=self._team, key=password)
+        if server is not None:
+            self._client = WOQLClient(server)
             try:
-                self._client.connect(team=self._team, db=self._db)
+                self._client.connect(key=password, db=self._db)
             except InterfaceError:
-                self._client.connect(team=self._team)
-                self._client.create_database(db_name)
+                self._client.connect(key=password)
+                self._client.create_database(self._db)
         else:
-            endpoint = f"https://cloud.terminusdb.com/{self._team}/"
-            self._client   = WOQLClient(endpoint)
-            try:
-                self._client.connect(team=self._team, use_token=True, db=self._db)
-            except InterfaceError:
-                self._client.connect(team=self._team, use_token=True)
-                self._client.create_database(db_name)
+            if local:
+                self._client = WOQLClient("http://localhost:6363", account=username, team=self._team, key=password)
+                try:
+                    self._client.connect(team=self._team, db=self._db)
+                except InterfaceError:
+                    self._client.connect(team=self._team)
+                    self._client.create_database(db_name)
+            else:
+                endpoint = f"https://cloud.terminusdb.com/{self._team}/"
+                self._client   = WOQLClient(endpoint)
+                try:
+                    self._client.connect(team=self._team, use_token=True, db=self._db)
+                except InterfaceError:
+                    self._client.connect(team=self._team, use_token=True)
+                    self._client.create_database(db_name)
         self.ontology = TerminusdbOntologyConfig(self._client)
 
     def drop_database(self):
