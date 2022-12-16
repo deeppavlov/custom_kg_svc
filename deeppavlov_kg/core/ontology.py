@@ -869,6 +869,14 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self.create_entity_kinds([entity_kind], [parent])
 
+    def update_label_of_entity_kind(self, entity_kind: str, label: str):
+        query = WOQL().woql_and(
+            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:comment", {'@type': "xsd:string", "@value": label}, "schema"),
+        )
+        return query.execute(self._client)
+
     def delete_entity_kind(self, entity_kind: str):
         ttl_schema = self._get_schema()
         instructions = ttl_schema.split(" .")
@@ -961,6 +969,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return self.create_property_kinds_of_entity_kinds(
             [entity_kind], [[property_kind]], [property_type], [property_type_family]
         )
+
+    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str):
+        query = WOQL().woql_and(
+            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
+        )    
+        return query.execute(self._client)
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         return self._delete_from_schema(entity_kind, property_kinds)
