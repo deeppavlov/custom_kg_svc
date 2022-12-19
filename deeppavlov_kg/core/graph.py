@@ -966,7 +966,11 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         entities = self.get_properties_of_entities(entity_ids)
         entities_dict = {entity.pop("@id"): entity for entity in entities}
         for entity_id, prop_kinds, prop_values in zip(entity_ids, property_kinds, new_property_values):
-            entities_dict[entity_id].update({prop_kind: prop_value for prop_kind, prop_value in zip(prop_kinds, prop_values)})
+            for prop_kind, prop_value in zip(prop_kinds, prop_values):
+                if prop_kind in entities_dict[entity_id] and isinstance(entities_dict[entity_id][prop_kind], list):
+                    entities_dict[entity_id][prop_kind].append(prop_value)
+                else:
+                    entities_dict[entity_id][prop_kind] = prop_value
         for k, entity in entities_dict.items():
             entity.update({"@id":k})
         entities = list(entities_dict.values())
