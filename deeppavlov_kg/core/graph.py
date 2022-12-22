@@ -1023,27 +1023,28 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
     def create_relationship(self, id_a: str, relationship_kind: str, id_b: str):
         self.create_or_update_property_of_entity(id_a, relationship_kind, id_b)
 
-    # TODO: you can discuss the case of relationship_kind is None to search for rels between a and b, rels from a, or rels to b
-    def search_for_relationships_or_properties(
+    def search_for_relationships(
         self,
-        relationship_kind: str,
+        relationship_kind: Optional[str] = None,
         id_a: Optional[str] = None,
         id_b: Optional[str] = None,
-    )-> List[Tuple[str, str]]:
-        """Search relationships OR PROPERTIES depending on the filters given."""
-        relationship_tuples = []
-        if id_a is not None:
-            props_a = self.get_properties_of_entity(id_a)
-            if relationship_kind in props_a:
-                relationship_tuples.append((id_a, props_a[relationship_kind]))
-        else:
-            for entity in self.get_all_entities():
-                if relationship_kind in entity:
-                    if id_b is not None:
-                        if entity[relationship_kind]!=id_b:
-                            continue
-                    relationship_tuples.append((entity["@id"], entity[relationship_kind]))
-        return relationship_tuples
+    )-> List[dict]:
+        """Search relationships depending on the filters given."""
+        relationship_kind = relationship_kind or "v:rel"
+        id_a = id_a or "v:id_a"
+        id_b = id_b or "v:id_b"
+        query = WOQL().quad(id_a, relationship_kind, id_b, "instance")
+        results = query.execute(self._client)["bindings"]
+        
+        for result in results.copy():
+            if "id_b" in result:
+                if not isinstance(result["id_b"], str) or result["id_b"].startswith("@"):
+                    results.remove(result) # remove entity-defining triples & property triples
+        pretty_results = []
+        for result in results:
+            dic = {k.split(":")[-1]: v.split(":")[-1] for k,v in result.items()}
+            pretty_results.append(dic)
+        return pretty_results
 
     # Extra
     def update_relationship(self, id_a: str, relationship_kind: str, new_id_b: Optional[str] = None):
@@ -1051,20 +1052,6 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
 
     def delete_relationship(self, id_a: str, relationship_kind: str, id_b: Optional[str] = None):
         return self.create_or_update_property_of_entity(id_a, relationship_kind, None)
-
-    def get_relationships_of_entities(self, entity_ids: List[str]) -> List[dict]:
-        properties = self.get_properties_of_entities(entity_ids)
-        relationships = []
-        for entity_properties in properties:
-            for prop in entity_properties:
-                if not prop.startswith("@"): # if a custom property
-                    relationship = self.ontology.get_relationship_kind(prop)
-                    if not relationship[0][1].startswith("xsd:"): # if a relationship
-                        relationships.append((prop, entity_properties[prop]))
-        return relationships
-
-    def get_relationships_of_entity(self, entity_id: str) -> List[dict]:
-        return self.get_relationships_of_entities([entity_id])
 
     def get_entities_by_date(self, entity_ids: List[str], date_to_inspect: datetime.datetime):
         history = self._client.get_commit_history()
