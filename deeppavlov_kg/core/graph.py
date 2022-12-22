@@ -1016,6 +1016,12 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         return self._client.get_document(entity_id)
 
     def create_relationships(self, ids_a: List[str], relationship_kinds: List[str], ids_b: List[str]):
+        entity_a_kinds = self.ontology._get_kinds_out_of_ids(ids_a)
+        entity_b_kinds = self.ontology._get_kinds_out_of_ids(ids_b)
+        relationship_kinds = self.ontology._get_relationship_kinds_by_labels_and_entity_kinds(
+            kinds_a=entity_a_kinds, relationship_labels=relationship_kinds, kinds_b=entity_b_kinds
+        )
+
         lists_of_rel_kinds = [[rel] for rel in relationship_kinds]
         lists_of_ids_b = [[id_b] for id_b in ids_b]
         return self.create_or_update_properties_of_entities(ids_a, lists_of_rel_kinds, lists_of_ids_b)
@@ -1043,6 +1049,8 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         pretty_results = []
         for result in results:
             dic = {k.split(":")[-1]: v.split(":")[-1] for k,v in result.items()}
+            if "rel" in dic:
+                dic["rel"] = self.ontology._full_qualified_rel_kind2rel_kind(dic["rel"])
             pretty_results.append(dic)
         return pretty_results
 

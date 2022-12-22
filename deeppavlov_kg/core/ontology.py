@@ -846,6 +846,84 @@ class TerminusdbOntologyConfig(OntologyConfig):
             types_str.append(types.get(item))
         return types_str
 
+    def _rel_kinds2full_qualified_rel_kinds(self, relationship_kinds: List[str], kinds_b: List[str]) -> List[str]:
+        return ["".join([rel_kind, "/", kind_b]) for rel_kind, kind_b in zip(relationship_kinds, kinds_b)]
+
+    def _full_qualified_rel_kind2rel_kind(self, full_qualified_relationship_kind: str) -> str:
+        return full_qualified_relationship_kind.split("/")[0]
+
+    def _get_kinds_out_of_ids(self, ids: List[str]) -> List[str]:
+        return [id.split("/")[0] for id in ids]
+
+    def _get_relationship_kinds_by_labels_and_entity_kinds(self, kinds_a, relationship_labels, kinds_b):
+        assert len(kinds_a) == len(relationship_labels) == len(kinds_b), (
+            "Number of kinds_a doesn't correspond properly with number of"
+                " kinds_b or relationship kinds. They should be equal"
+        )
+        allowed_rels = self._get_relationship_kinds_by_labels(relationship_labels)
+        allowed_relationships = {}
+        # organizing allowed_rels
+        for dic in allowed_rels:
+            if (dic["kind_a"], dic["kind_b"]) not in allowed_relationships:
+                allowed_relationships[(dic["kind_a"], dic["kind_b"])] = [dic["rel"]]
+            else:
+                allowed_relationships[(dic["kind_a"], dic["kind_b"])].append(dic["rel"])
+        
+        parents = self._get_parents_of_entity_kinds(kinds_a + kinds_b)
+
+        transformed_relationships = []
+        for (kind_a, relationship_label, kind_b) in zip(kinds_a, relationship_labels, kinds_b):
+            if (kind_a, kind_b) in allowed_relationships:
+                for rel in allowed_relationships[(kind_a, kind_b)]:
+                    if rel.startswith(relationship_label):
+                        transformed_relationships.append(rel)
+                        break
+                else: # if no relationship from base starts with some relationship_label
+                    raise ValueError(f"There's no such relationship like '{relationship_label}'. allowed_relationships: '{allowed_relationships}'")
+                continue
+
+            rel_terminals = {
+                "kinds_a": parents[kind_a] + [kind_a] if kind_a in parents else [kind_a],
+                "kinds_b": parents[kind_b] + [kind_b] if kind_b in parents else [kind_b]
+            }
+
+            for kind_a in rel_terminals["kinds_a"]:
+                for kind_b in rel_terminals["kinds_b"]:
+                    if (kind_a, kind_b) in allowed_relationships:
+                        for rel in allowed_relationships[(kind_a, kind_b)]:
+                            if rel.startswith(relationship_label):
+                                transformed_relationships.append(rel)
+                                break
+                        else: # if no relationship from base starts with some relationship_label
+                            raise ValueError(f"There's no such relationship like '{relationship_label}'. allowed_relationships: '{allowed_relationships}'")
+                        break
+                else:
+                    continue
+                break
+            else: # if the loop has finished without any 'append' then the (kind_a, kind_b) isn't allowed
+                raise ValueError(f"There's no relationship kind between '{(kind_a, kind_b)}'. allowed_relationships: '{allowed_relationships}'")
+        return transformed_relationships
+
+    def _get_parents_of_entity_kinds(self, entity_kinds: List[str]):
+        entity_kind = entity_kinds.pop(0)
+        query = WOQL().quad(f"@schema:{entity_kind}", "sys:inherits", f"v:{entity_kind}", "schema")
+        for entity_kind in entity_kinds:
+            query = WOQL().woql_or(
+            query,
+            WOQL().quad(f"@schema:{entity_kind}", "sys:inherits", f"v:{entity_kind}", "schema")
+            )
+        results = query.execute(self._client)
+        pretty_results = {}
+        for dic in results["bindings"]:
+            for k, v in dic.items():
+                if v is not None:
+                    if k not in pretty_results:
+                        pretty_results[k] = [v.split(":")[-1]]
+                    else:
+                        pretty_results[k].append(v.split(":")[-1])
+                    #return a list of parents not only the last appended one )
+        return pretty_results
+
     def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
         if parents is None:
             parents = [None]*len(entity_kinds)
@@ -970,7 +1048,29 @@ class TerminusdbOntologyConfig(OntologyConfig):
             [entity_kind], [[property_kind]], [property_type], [property_type_family]
         )
 
-    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str):
+    def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]): #TODO: look into 'comment' instead of all these update_quad
+        entity_kind = entity_kinds.pop(0)
+        property_kind = property_kinds.pop(0)
+        label = labels.pop(0)
+        query = WOQL().woql_and(
+            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
+        )    
+        for entity_kind, property_kind, label in zip(entity_kinds, property_kinds, labels):
+            query = WOQL().woql_and(
+                query,
+                WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
+                WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
+                WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
+                WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
+                WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
+            )    
+        return query.execute(self._client)
+
+    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str): #TODO: look into 'comment' instead of all these update_quad
         query = WOQL().woql_and(
             WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
             WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
@@ -992,6 +1092,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
         relationship_kinds: List[str],
         entity_kinds_b: List[str],
     ):
+        relationship_kind_labels = relationship_kinds.copy()
+        relationship_kinds = self._rel_kinds2full_qualified_rel_kinds(relationship_kinds, entity_kinds_b)
         ttl_schema_parts = []
         for (
             entity_kind,
@@ -1009,7 +1111,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 )
             )
         ttl_schema = "\n".join(ttl_schema_parts)
-        return self._commit_to_schema(ttl_schema)
+        self._commit_to_schema(ttl_schema)
+        return self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])
@@ -1023,9 +1126,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 relationship_details.append((entity_kind, props[relationship_kind]["@class"]))
         return relationship_details
 
-    def get_relationship_kinds_by_label(self, label: str) -> List[dict]:
-        kind_b = {'@type': 'xsd:string', '@value': label}
-        query = WOQL().quad("v:kind_a", "v:rel", "v:kind_b", "schema") + WOQL().quad("v:props_with_labels", "v:rel", kind_b, "schema")
+    def _get_relationship_kinds_by_labels(self, labels: List[str]) -> List[dict]:
+        labels = labels.copy()
+        kind_b = {'@type': 'xsd:string', '@value': labels.pop(0)}
+        query = WOQL().select("kind_a", "rel", "kind_b").quad("v:kind_a", "v:rel", "v:kind_b", "schema").quad("v:props_with_labels", "v:rel", kind_b, "schema")
+        for label in labels:
+            kind_b = {'@type': 'xsd:string', '@value': label}
+            query = WOQL().woql_or(
+                query,
+                WOQL().select("kind_a", "rel", "kind_b").quad("v:kind_a", "v:rel", "v:kind_b", "schema").quad("v:props_with_labels", "v:rel", kind_b, "schema"),
+            )
         results = query.execute(self._client)
         relationships = [triple for triple in results["bindings"] if "documentation" not in triple["kind_a"]]
         for relationship in relationships:
