@@ -10,7 +10,7 @@ from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError, DuplicatedNodeIdError
 import re
 from terminusdb_client.errors import DatabaseError
-
+from terminusdb_client import WOQLQuery as WOQL
 
 class Kind:
     """A class to represent an entity. It's used as argument for treelib node data"""
