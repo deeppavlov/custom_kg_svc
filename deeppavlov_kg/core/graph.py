@@ -923,6 +923,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self._client.delete_database(DB, team=TEAM)
         self._client.create_database(DB, team=TEAM)
         logging.info("Database was recreated successfully")
+        self.ontology.init_abstract_kind()
 
 
     def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
