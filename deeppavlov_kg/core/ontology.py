@@ -632,8 +632,36 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def __init__(
         self,
         client,
+        kg,
     ):
         self._client = client
+        self.kg = kg
+        self.init_abstract_kind()
+
+    def init_abstract_kind(self):
+        self.create_entity_kind("Abstract")
+        self.create_property_kind_of_entity_kind("Abstract", "Name", str) # TODO: make it mandatory
+        self.create_relationship_kind("Abstract", "Has_parent", "Abstract")
+
+    def _create_abstract_instances(self, entity_kinds: List[str], parents: List[Union[str, None]]):
+        entity_ids = ["Abstract/"+kind for kind in entity_kinds]
+        self.kg.create_entities(
+            entity_kinds=["Abstract"]*len(entity_kinds),
+            entity_ids=entity_ids,
+            property_kinds=[["Name"]]*len(entity_kinds),
+            property_values=[[kind] for kind in entity_kinds]
+        )
+        existing_parents = parents.copy()
+        entity_with_parents = entity_ids.copy()
+        for entity_id, parent in zip(entity_ids, parents):
+            if parent is None:
+                existing_parents.remove(parent)
+                entity_with_parents.remove(entity_id)
+        existing_parents = ["Abstract/"+parent for parent in existing_parents]
+        self.kg.create_relationships(
+            entity_with_parents, ["Has_parent"]*len(existing_parents), existing_parents
+        )
+        return entity_ids
 
     def _form_property_uri(self, entity_kind, property, prop_type="string", type_family="Optional"):
         uri = f"<schema#{entity_kind}/{property}/{type_family}+xsd%3A{prop_type}> "
@@ -849,6 +877,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
         if parents is None:
             parents = [None]*len(entity_kinds)
+
+        if entity_kinds!=["Abstract"]:
+            abstract_kinds_instances = self._create_abstract_instances(entity_kinds, parents)
+        else:
+            abstract_kinds_instances = None
+
         ttl_schema_parts = []
         for (
             entity_kind,
@@ -864,7 +898,11 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 )
             )
             ttl_schema = "\n".join(ttl_schema_parts)
-        return self._commit_to_schema(ttl_schema)
+        results = self._commit_to_schema(ttl_schema)
+        if results["api:status"] == "api:success":
+            return abstract_kinds_instances or results
+        else:
+            raise DatabaseError("failed to commit to schema")
 
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self.create_entity_kinds([entity_kind], [parent])

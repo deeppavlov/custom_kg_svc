@@ -914,7 +914,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
                 except InterfaceError:
                     self._client.connect(team=self._team, use_token=True)
                     self._client.create_database(db_name)
-        self.ontology = TerminusdbOntologyConfig(self._client)
+        self.ontology = TerminusdbOntologyConfig(self._client, self)
 
     def drop_database(self):
         """Clears the database from ontology and knowledge graphs."""
