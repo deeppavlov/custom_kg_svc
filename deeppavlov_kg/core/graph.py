@@ -1028,7 +1028,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         return self.create_or_update_properties_of_entities(ids_a, lists_of_rel_kinds, lists_of_ids_b)
 
     def create_relationship(self, id_a: str, relationship_kind: str, id_b: str):
-        self.create_or_update_property_of_entity(id_a, relationship_kind, id_b)
+        return self.create_relationships([id_a], [relationship_kind], [id_b])
 
     def search_for_relationships(
         self,

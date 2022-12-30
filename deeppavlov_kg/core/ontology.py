@@ -641,7 +641,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
     def init_abstract_kind(self):
         self.create_entity_kind("Abstract")
         self.create_property_kind_of_entity_kind("Abstract", "Name", str) # TODO: make it mandatory
-        self.create_relationship_kind("Abstract", "Has_parent", "Abstract")
+        self.create_relationship_kind("Abstract", "HAS_PARENT", "Abstract")
 
     def _create_abstract_instances(self, entity_kinds: List[str], parents: List[Union[str, None]]):
         entity_ids = ["Abstract/"+kind for kind in entity_kinds]
@@ -659,7 +659,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 entity_with_parents.remove(entity_id)
         existing_parents = ["Abstract/"+parent for parent in existing_parents]
         self.kg.create_relationships(
-            entity_with_parents, ["Has_parent"]*len(existing_parents), existing_parents
+            entity_with_parents, ["HAS_PARENT"]*len(existing_parents), existing_parents
         )
         return entity_ids
 
@@ -1180,7 +1180,6 @@ class TerminusdbOntologyConfig(OntologyConfig):
             relationship["kind_a"] = relationship["kind_a"].split(":")[-1]
             relationship["rel"] = relationship["rel"].split(":")[-1]
             relationship["kind_b"] = relationship["kind_b"].split("+")[-1]
-            relationship.pop("props_with_labels")
         relationships = [dict(triple) for triple in {tuple(relationship.items()) for relationship in relationships}] # to delete duplicates
         return relationships
 
