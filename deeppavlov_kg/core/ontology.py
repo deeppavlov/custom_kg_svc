@@ -636,10 +636,11 @@ class TerminusdbOntologyConfig(OntologyConfig):
     ):
         self._client = client
         self.kg = kg
-        self.init_abstract_kind()
+        if self._client.get_class_frame("Abstract").get("Name") is None:
+            self.init_abstract_kind()
 
     def init_abstract_kind(self):
-        self.create_entity_kind("Abstract")
+        self.create_entity_kind("Abstract") # TODO: merge it all in one-line code: create [entity_kinds, properties, relationships]
         self.create_property_kind_of_entity_kind("Abstract", "Name", str) # TODO: make it mandatory
         self.create_relationship_kind("Abstract", "HAS_PARENT", "Abstract")
 
