@@ -659,9 +659,10 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 existing_parents.remove(parent)
                 entity_with_parents.remove(entity_id)
         existing_parents = ["Abstract/"+parent for parent in existing_parents]
-        self.kg.create_relationships(
-            entity_with_parents, ["HAS_PARENT"]*len(existing_parents), existing_parents
-        )
+        if existing_parents:
+            self.kg.create_relationships(
+                entity_with_parents, ["HAS_PARENT"]*len(existing_parents), existing_parents
+            )
         return entity_ids
 
     def _form_property_uri(self, entity_kind, property, prop_type="string", type_family="Optional"):
