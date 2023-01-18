@@ -826,6 +826,10 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return query.execute(self._client)
 
     def delete_entity_kinds(self, entity_kinds: List[str]):
+        # delete from Abstract
+        entity_ids = [f"Abstract/{entity_kind}" for entity_kind in entity_kinds]
+        self.kg.delete_entities(entity_ids)
+
         query = WOQL().quad("v:a", "v:r", "v:b", "schema")
         for entity_kind in entity_kinds:
             query = WOQL().woql_and(
@@ -840,10 +844,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     # delete the class properties definitions
                     WOQL().quad(
                         f"@schema:{entity_kind}", f"v:property_{entity_kind}", f"v:property_def_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"@schema:{entity_kind}", f"v:property_{entity_kind}", f"v:property_def_{entity_kind}", "schema"
                     ).quad(
                         f"v:property_def_{entity_kind}", f"sys:class", f"v:property_def_value_{entity_kind}", "schema"
                     ).delete_quad(
-                        f"@schema:{entity_kind}", f"v:property_{entity_kind}", f"v:property_def_{entity_kind}", "schema"
+                        f"v:property_def_{entity_kind}", f"sys:class", f"v:property_def_value_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:property_def_{entity_kind}", f"rdf:type", f"v:property_type_family_value_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:property_def_{entity_kind}", f"rdf:type", f"v:property_type_family_value_{entity_kind}", "schema"
                     ),
                     # delete the children of class
                     WOQL().quad(
@@ -851,22 +861,56 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     ).delete_quad(
                         f"v:child_{entity_kind}", "sys:inherits", f"@schema:{entity_kind}", "schema"
                     ),
-                    # delete relationship definitions
+                    # delete the parents of class
                     WOQL().quad(
+                        f"@schema:{entity_kind}", "sys:inherits", f"v:parent_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"@schema:{entity_kind}", "sys:inherits", f"v:parent_{entity_kind}", "schema"
+                    ),
+                    # delete documentation of properties of class
+                    WOQL().quad(
+                        f"@schema:{entity_kind}", "sys:documentation", f"v:doc_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"@schema:{entity_kind}", "sys:documentation", f"v:doc_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:doc_{entity_kind}", f"rdf:type", f"sys:Documentation", "schema"
+                    ).delete_quad(
+                        f"v:doc_{entity_kind}", f"rdf:type", f"sys:Documentation", "schema"
+                    ).quad(
+                        f"v:doc_{entity_kind}", f"sys:properties", f"v:class_property_doc_def_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:doc_{entity_kind}", f"sys:properties", f"v:class_property_doc_def_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:class_property_doc_def_{entity_kind}", f"v:prop_label_and_prop_doc_def{entity_kind}", f"v:prop_label&def_values_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:class_property_doc_def_{entity_kind}", f"v:prop_label_and_prop_doc_def{entity_kind}", f"v:prop_label&def_values_{entity_kind}", "schema"
+                    ),
+                    # delete backward relationship definitions from kind_a
+                    WOQL().quad(
+                        f"v:rel_def_{entity_kind}", "sys:class", f"@schema:{entity_kind}", "schema"
+                    ).delete_quad(
                         f"v:rel_def_{entity_kind}", "sys:class", f"@schema:{entity_kind}", "schema"
                     ).quad(
                         f"v:kind_a_{entity_kind}", f"v:rel_{entity_kind}", f"v:rel_def_{entity_kind}", "schema"
                     ).delete_quad(
                         f"v:kind_a_{entity_kind}", f"v:rel_{entity_kind}", f"v:rel_def_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:rel_def_{entity_kind}", f"v:rel_def_family_type_{entity_kind}", f"v:family_type_value_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:rel_def_{entity_kind}", f"v:rel_def_family_type_{entity_kind}", f"v:family_type_value_{entity_kind}", "schema"
                     # delete documentation of a backward relationship from kind_a
                     ).quad(
                         f"v:kind_a_{entity_kind}", "sys:documentation", f"v:doc_a_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:kind_a_{entity_kind}", "sys:documentation", f"v:doc_a_{entity_kind}", "schema"
                     ).quad(
                         f"v:doc_a_{entity_kind}", "sys:properties", f"v:property_doc_def_{entity_kind}", "schema"
-                    ).quad(
-                        f"v:property_doc_def_{entity_kind}", f"v:rel_{entity_kind}", f"v:label_value_{entity_kind}", "schema"
                     ).delete_quad(
-                        f"v:property_doc_def_{entity_kind}", f"v:rel_{entity_kind}", f"v:label_value_{entity_kind}", "schema"
+                        f"v:doc_a_{entity_kind}", "sys:properties", f"v:property_doc_def_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:property_doc_def_{entity_kind}", f"v:rel_label_and_rel_doc_def", f"v:rel_label&def_values_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:property_doc_def_{entity_kind}", f"v:rel_label_and_rel_doc_def", f"v:rel_label&def_values_{entity_kind}", "schema"
                     )
                 )
             )
