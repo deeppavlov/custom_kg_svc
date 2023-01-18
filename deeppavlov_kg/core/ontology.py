@@ -666,11 +666,11 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return entity_ids
 
     def _form_property_uri(self, entity_kind, property, prop_type="string", type_family="Optional"):
-        uri = f"<schema#{entity_kind}/{property}/{type_family}+xsd%3A{prop_type}> "
+        uri = f"@schema:{entity_kind}/{property}/{type_family}+xsd%3A{prop_type}"
         return uri
 
     def _form_relationship_uri(self, entity_kind, relationship, related_kind):
-        uri = f"<schema#{entity_kind}/{relationship}/Set+{related_kind}> "
+        uri = f"@schema:{entity_kind}/{relationship}/Set+{related_kind}"
         return uri    
 
     def _get_schema(self):
@@ -685,175 +685,6 @@ class TerminusdbOntologyConfig(OntologyConfig):
             """
         ])
         return ttl_schema
-
-    def _create_or_update_schema(
-        self,
-        entity_kind: str,
-        parent: Optional[str] = None,
-        property_kinds: Optional[List[str]] = None,
-        property_types: Optional[List[Type]] = None,
-        properties_type_families: Optional[List[Type]] = None,
-        relationship_kinds: Optional[List[Tuple[str, str]]] = None,
-    ):
-        # TODO: check if the relationship kind exist raise an error
-        # properties processing
-
-        if parent is not None:
-            inherits_parent = f"sys:inherits <schema#{parent}> ;"
-        else:
-            inherits_parent = ""
-
-        if property_kinds is not None:
-            if property_types is not None:
-                assert len(property_types) == len(property_kinds), (
-                        "Number of property types doesn't correspond properly with number of"
-                        " property kinds. They should be equal"
-                    )
-            else:
-                property_types = [str] * len(property_kinds)
-            
-            if property_types is not None:
-                property_types = TerminusdbOntologyConfig._type2str(property_types)
-            
-            if properties_type_families is not None:
-                assert len(properties_type_families) == len(property_kinds), (
-                        "Number of property type families doesn't correspond properly with number of"
-                        " property kinds. They should be equal"
-                    )
-                valid_type_families = {list, set, Optional, "Mandatory"}
-                for type_family in properties_type_families:
-                    if type_family not in valid_type_families:
-                        raise ValueError(f"type_family must be one of {valid_type_families}. Got {type_family}")
-            else:
-                properties_type_families = [Optional] * len(property_kinds)
-
-            properties_type_families = self._type2str(properties_type_families)
-            prop_definitions = []
-            properties = []
-            for prop, type, type_family in zip(property_kinds, property_types, properties_type_families):
-                prop_uri = self._form_property_uri(entity_kind, prop, type, type_family)
-                prop_addition = f"""
-                    <schema#{prop}> {prop_uri}
-                """
-                if type_family != "Mandatory":
-                    prop_definition = f"""
-                        {prop_uri}
-                            a sys:{type_family} ;
-                            sys:class xsd:{type} .
-                    """
-                else:
-                    prop_definition = ""
-                properties.append(prop_addition)
-                prop_definitions.append(prop_definition)
-            ttl_properties = " ;\n".join(properties)
-            ttl_prop_definitions = "\n".join(prop_definitions)
-        else:
-            ttl_properties = ""
-            ttl_prop_definitions = ""
-
-        # Relationships processing
-        if relationship_kinds:
-            rel_additions = []
-            rel_definitions = []
-            for (relationship_kind, related_kind) in relationship_kinds:
-                rel_uri = self._form_relationship_uri(entity_kind, relationship_kind, related_kind)
-                rel_addition = f"""
-                    <schema#{relationship_kind}> {rel_uri} 
-                """ 
-
-                rel_definition = f"""
-                    {rel_uri}
-                        a sys:Set ;
-                        sys:class <schema#{related_kind}> .
-                """
-                rel_additions.append(rel_addition)
-                rel_definitions.append(rel_definition)
-            ttl_relationships = " ;\n".join(rel_additions)
-            ttl_rel_definitions = "\n".join(rel_definitions)
-        else:
-            ttl_relationships = ""
-            ttl_rel_definitions = ""
-
-        ttl_schema = f"""
-            <schema#{entity_kind}>
-            a sys:Class ;
-            {inherits_parent}
-              {ttl_properties}
-              {ttl_relationships} .
-            {ttl_prop_definitions}
-            {ttl_rel_definitions}
-        """
-        return ttl_schema
-
-    def _commit_to_schema(self, ttl_schema: str):
-        ttl_schema_prefixes = f"""
-            @base <terminusdb:///schema#> .
-            @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-            @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-            @prefix woql: <http://terminusdb.com/schema/woql#> .
-            @prefix json: <http://terminusdb.com/schema/json#> .
-            @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-            @prefix xdd: <http://terminusdb.com/schema/xdd#> .
-            @prefix vio: <http://terminusdb.com/schema/vio#> .
-            @prefix sys: <http://terminusdb.com/schema/sys#> .
-            @prefix api: <http://terminusdb.com/schema/api#> .
-            @prefix owl: <http://www.w3.org/2002/07/owl#> .
-            @prefix doc: <data/> .
-        """
-        ttl_schema_tail = """<terminusdb://context>
-            a sys:Context ;
-            sys:base "terminusdb:///data/"^^xsd:string ;
-            sys:schema "terminusdb:///schema#"^^xsd:string .
-        """
-        ttl_schema = "\n".join([
-            ttl_schema_prefixes, ttl_schema, ttl_schema_tail
-        ])
-        return self._client.insert_triples(
-            graph_type='schema',
-            content=ttl_schema,
-            commit_msg="Insert triples"
-        )
-
-    def _delete_from_schema(
-        self,
-        entity_kind: str,
-        property_kinds: List[str],
-        # entity_kind_b: str = "All",
-    ):
-        ttl_schema = self._get_schema()
-        instructions = ttl_schema.split(" .")
-        new_instructions = []
-        for instruction in instructions:
-            add_instruction=True
-            for property_kind in property_kinds:
-                # delete definition
-                if (
-                    f"<schema#{entity_kind}/{property_kind}/" in instruction 
-                    and "a sys:Class" not in instruction
-                ):
-                    add_instruction=False
-                    continue
-                # delete mention
-                elif f"<schema#{entity_kind}>" in instruction and "a sys:Class" in instruction:
-                    # if entity_kind_b != "All":
-                    #     pattern_of_rel_with_kind_b = f".*<schema#\w*/{property_kind}/\w*\+{entity_kind_b}>.*"
-                    #     if re.match(pattern_of_rel_with_kind_b, instruction, re.DOTALL) is not None:
-                    #         # then delete only this line from the instruction
-                    #         instruction = "".join(re.split(pattern_of_rel_with_kind_b, instruction))
-                    # else: # if "All" and this's relationship, it will delete relationships between entity_kind and all existing entity_kind_b. if a property, then it'll delete every mention of this property.
-                    prop_definition_pattern = f"<schema#{property_kind}>.*;"
-                    if not instruction.endswith(";"):
-                        instruction = "".join([instruction, ";"])
-                    instruction = "".join(re.split(prop_definition_pattern, instruction))
-            if not add_instruction:
-                continue
-            new_instructions.append(instruction)
-        ttl_schema = ".".join(new_instructions)
-
-        try:
-            return self._client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
-        except DatabaseError:
-            logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
 
     @staticmethod
     def _type2str(types_to_convert: List[Type]) -> List[str]:
@@ -958,31 +789,30 @@ class TerminusdbOntologyConfig(OntologyConfig):
         if parents is None:
             parents = [None]*len(entity_kinds)
 
-        if entity_kinds!=["Abstract"]:
-            abstract_kinds_instances = self._create_abstract_instances(entity_kinds, parents)
-        else:
-            abstract_kinds_instances = None
+        query = WOQL().woql_and(*[
+            WOQL().add_quad(":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema") for entity_kind in entity_kinds
+        ])
 
-        ttl_schema_parts = []
-        for (
-            entity_kind,
-            parent,
-        ) in zip(
-            entity_kinds,
-            parents,
-        ):
-            ttl_schema_parts.append(
-                self._create_or_update_schema(
-                    entity_kind,
-                    parent=parent,
-                )
-            )
-            ttl_schema = "\n".join(ttl_schema_parts)
-        results = self._commit_to_schema(ttl_schema)
-        if results["api:status"] == "api:success":
-            return abstract_kinds_instances or results
+        query = WOQL().woql_and(
+            query,
+            *[
+                WOQL().add_quad(":".join(["@schema", entity_kind]), "sys:inherits", ":".join(["@schema", parent]), "schema")
+                for entity_kind, parent in zip(entity_kinds, parents) if parent is not None
+            ]
+        )
+        result = query.execute(self._client)
+
+        if result == "Commit successfully made.":
+            if entity_kinds!=["Abstract"]:
+                abstract_kinds_instances = self._create_abstract_instances(entity_kinds, parents)
+            else:
+                abstract_kinds_instances = None
+
+            return abstract_kinds_instances
+        elif result["api:status"] == "api:success":
+            logging.info("Abstract kind is already in database")
         else:
-            raise DatabaseError("failed to commit to schema")
+            raise DatabaseError(f"failed to commit to schema, message: {result['api:status']}")
 
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self.create_entity_kinds([entity_kind], [parent])
@@ -995,27 +825,59 @@ class TerminusdbOntologyConfig(OntologyConfig):
         )
         return query.execute(self._client)
 
+    def delete_entity_kinds(self, entity_kinds: List[str]):
+        query = WOQL().quad("v:a", "v:r", "v:b", "schema")
+        for entity_kind in entity_kinds:
+            query = WOQL().woql_and(
+                query,
+                WOQL().woql_or(
+                    # delete the class definition
+                    WOQL().quad(
+                        f"@schema:{entity_kind}", f"rdf:type", f"sys:Class", "schema"
+                    ).delete_quad(
+                        f"@schema:{entity_kind}", f"rdf:type", f"sys:Class", "schema"
+                    ),
+                    # delete the class properties definitions
+                    WOQL().quad(
+                        f"@schema:{entity_kind}", f"v:property_{entity_kind}", f"v:property_def_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:property_def_{entity_kind}", f"sys:class", f"v:property_def_value_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"@schema:{entity_kind}", f"v:property_{entity_kind}", f"v:property_def_{entity_kind}", "schema"
+                    ),
+                    # delete the children of class
+                    WOQL().quad(
+                        f"v:child_{entity_kind}", "sys:inherits", f"@schema:{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:child_{entity_kind}", "sys:inherits", f"@schema:{entity_kind}", "schema"
+                    ),
+                    # delete relationship definitions
+                    WOQL().quad(
+                        f"v:rel_def_{entity_kind}", "sys:class", f"@schema:{entity_kind}", "schema"
+                    ).quad(
+                        f"v:kind_a_{entity_kind}", f"v:rel_{entity_kind}", f"v:rel_def_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:kind_a_{entity_kind}", f"v:rel_{entity_kind}", f"v:rel_def_{entity_kind}", "schema"
+                    # delete documentation of a backward relationship from kind_a
+                    ).quad(
+                        f"v:kind_a_{entity_kind}", "sys:documentation", f"v:doc_a_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:doc_a_{entity_kind}", "sys:properties", f"v:property_doc_def_{entity_kind}", "schema"
+                    ).quad(
+                        f"v:property_doc_def_{entity_kind}", f"v:rel_{entity_kind}", f"v:label_value_{entity_kind}", "schema"
+                    ).delete_quad(
+                        f"v:property_doc_def_{entity_kind}", f"v:rel_{entity_kind}", f"v:label_value_{entity_kind}", "schema"
+                    )
+                )
+            )
+        result = query.execute(self._client)
+        if result == "Commit successfully made.":
+            return result
+        elif not result.get("bindings"):
+            raise ValueError("Something wrong with the entered entity kinds")
+
     def delete_entity_kind(self, entity_kind: str):
-        ttl_schema = self._get_schema()
-        instructions = ttl_schema.split(" .")
-        new_instructions = []
-        pattern_of_rel_with_kind_b_equal_entity_kind = f".*<schema#\w*/\w*/\w*\+{entity_kind}>.*"
-        for instruction in instructions:
-            if (
-                (f"<schema#{entity_kind}>" in instruction and "a sys:Class" in instruction) # the entity_kind class definition
-                or (f"<schema#{entity_kind}" in instruction and "a sys:Class" not in instruction) # definitions of properties of entity_kind class
-                or (re.match(pattern_of_rel_with_kind_b_equal_entity_kind, instruction, re.DOTALL) is not None and "a sys:Class" not in instruction) # definitions of relationships that have their entity_kind_b=entity_kind
-            ):
-                continue
-            elif re.match(pattern_of_rel_with_kind_b_equal_entity_kind, instruction, re.DOTALL) is not None and "a sys:Class" in instruction: # entity_kind mentions in other classes definitions where relationship entity_kind_b=entity_kind
-                # then delete only this line from the instruction
-                instruction = "".join(re.split(pattern_of_rel_with_kind_b_equal_entity_kind, instruction))
-            new_instructions.append(instruction)
-        ttl_schema = ".".join(new_instructions)
-        try:
-            return self._client.update_triples(graph_type='schema', content=ttl_schema, commit_msg="Insert triples")
-        except DatabaseError:
-            logging.error("Most likely, you're trying to delete a property that already has instances for some documents.")
+        return self.delete_entity_kinds([entity_kind])
 
     def get_all_entity_kinds(self):
         """Returns all entity kinds with their direct properties in addition to the parent classes if exist"""
@@ -1032,11 +894,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
         property_types: Optional[List[List[Type]]]= None,
         properties_type_families: Optional[List[List[Type]]] = None,
     ):
-        ttl_schema_parts = []
         if properties_type_families is None:
-            properties_type_families = [None] * len(entity_kinds)
+            properties_type_families = [[None]*len(prop_kinds) for prop_kinds in property_kinds]
         if property_types is None:
-            property_types = [None] * len(entity_kinds)
+            property_types = [[None]*len(prop_kinds) for prop_kinds in property_kinds]
+
+        query = WOQL().quad("v:a", "v:r", "v:c", "schema")
         for (
             entity_kind,
             property_kinds_for_this_entity_kind,
@@ -1048,16 +911,26 @@ class TerminusdbOntologyConfig(OntologyConfig):
             property_types,
             properties_type_families,
         ):
-            ttl_schema_parts.append(
-                self._create_or_update_schema(
-                    entity_kind,
-                    property_kinds=property_kinds_for_this_entity_kind,
-                    property_types=property_types_for_this_entity_kind,
-                    properties_type_families=properties_type_families_for_this_entity_kind,
-                )
+            property_types_for_this_entity_kind = list(
+                map(lambda x: x if x is not None else str, property_types_for_this_entity_kind)
             )
-        ttl_schema = "\n".join(ttl_schema_parts)
-        return self._commit_to_schema(ttl_schema)
+            properties_type_families_for_this_entity_kind = list(
+                map(lambda x: x if x is not None else Optional, properties_type_families_for_this_entity_kind)
+            )
+            property_types_for_this_entity_kind = self._type2str(property_types_for_this_entity_kind)
+            properties_type_families_for_this_entity_kind = self._type2str(properties_type_families_for_this_entity_kind)
+
+            for prop_kind, prop_type, type_family in zip(
+                property_kinds_for_this_entity_kind, property_types_for_this_entity_kind, properties_type_families_for_this_entity_kind
+            ):
+                uri = self._form_property_uri(entity_kind, prop_kind, prop_type, type_family)
+                query = WOQL().woql_and(
+                    query,
+                    WOQL().add_quad(":".join(["@schema", entity_kind]), ":".join(["@schema", prop_kind]), uri, "schema"),
+                    WOQL().add_quad(uri, "sys:class", f"xsd:{prop_type}", "schema"),
+                    WOQL().add_quad(uri, "rdf:type", f"sys:{type_family}", "schema"),
+                )
+        return query.execute(self._client)
 
     def create_property_kinds_of_entity_kind(
         self,
@@ -1066,11 +939,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
         property_types: Optional[List[Type]]= None,
         properties_type_families: Optional[List[Type]] = None,
     ):
+        if property_types is not None:
+            property_types = [property_types]
+        if properties_type_families is not None:
+            properties_type_families = [properties_type_families]
+
         return self.create_property_kinds_of_entity_kinds(
             [entity_kind],
             [property_kinds],
-            [property_types],
-            [properties_type_families],
+            property_types,
+            properties_type_families,
         )
 
     def create_property_kind_of_entity_kind(
@@ -1084,8 +962,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             property_type = [property_type]
         if property_type_family is not None:
             property_type_family = [property_type_family]
-        return self.create_property_kinds_of_entity_kinds(
-            [entity_kind], [[property_kind]], [property_type], [property_type_family]
+        return self.create_property_kinds_of_entity_kind(
+            entity_kind, [property_kind], property_type, property_type_family
         )
 
     def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]): #TODO: look into 'comment' instead of all these update_quad
@@ -1097,7 +975,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
             WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
             WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
+            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"), # TODO: try woql().string(label) instead of {'@type': "xsd:string", "@value": label}
         )    
         for entity_kind, property_kind, label in zip(entity_kinds, property_kinds, labels):
             query = WOQL().woql_and(
@@ -1121,7 +999,15 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return query.execute(self._client)
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
-        return self._delete_from_schema(entity_kind, property_kinds)
+        query = WOQL().woql_and(
+            *[
+                WOQL().quad(
+                    f"@schema:{entity_kind}", f"@schema:{property_kind}", f"v:variable_{property_kind}", "schema"
+                ).delete_quad(f"@schema:{entity_kind}", f"@schema:{property_kind}", f"v:variable_{property_kind}", "schema")
+                for property_kind in property_kinds
+            ]
+        )
+        return query.execute(self._client)
 
     def delete_property_kind(self, entity_kind: str, property_kind: str):
         return self.delete_property_kinds(entity_kind, [property_kind])
@@ -1135,23 +1021,19 @@ class TerminusdbOntologyConfig(OntologyConfig):
         relationship_kind_labels = relationship_kinds.copy()
         relationship_kinds = self._rel_kinds2full_qualified_rel_kinds(relationship_kinds, entity_kinds_b)
         ttl_schema_parts = []
-        for (
-            entity_kind,
-            relationship_kind,
-            entity_kind_b,
-        ) in zip(
-            entity_kinds_a,
-            relationship_kinds,
-            entity_kinds_b,
-        ):
-            ttl_schema_parts.append(
-                self._create_or_update_schema(
-                    entity_kind,
-                    relationship_kinds=[(relationship_kind, entity_kind_b)],
+
+        query = WOQL().quad("v:a", "v:r", "v:c", "schema")
+        for entity_kind_a, rel_kind, entity_kind_b in zip(
+                entity_kinds_a, relationship_kinds, entity_kinds_b 
+            ):
+                uri = self._form_relationship_uri(entity_kind_a, rel_kind, entity_kind_b)
+                query = WOQL().woql_and(
+                    query,
+                    WOQL().add_quad(":".join(["@schema", entity_kind_a]), ":".join(["@schema", rel_kind]), uri, "schema"),
+                    WOQL().add_quad(uri, "sys:class", f"@schema:{entity_kind_b}", "schema"),
+                    WOQL().add_quad(uri, "rdf:type", f"sys:Set", "schema"),
                 )
-            )
-        ttl_schema = "\n".join(ttl_schema_parts)
-        self._commit_to_schema(ttl_schema)
+        query.execute(self._client)
         return self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
@@ -1185,8 +1067,29 @@ class TerminusdbOntologyConfig(OntologyConfig):
         relationships = [dict(triple) for triple in {tuple(relationship.items()) for relationship in relationships}] # to delete duplicates
         return relationships
 
-    def delete_relationship_kinds(self, entity_kind_a: str, relationship_kinds: List[str]):
-        return self.delete_property_kinds(entity_kind_a, relationship_kinds)
+    def delete_relationship_kinds(self, entity_kinds_a: List[str], relationship_kinds: List[str], entity_kinds_b: List[str]):
+        relationship_kinds = self._get_relationship_kinds_by_labels_and_entity_kinds(
+            entity_kinds_a, relationship_kinds, entity_kinds_b
+        )
+        query = WOQL().woql_and(
+            *[
+                WOQL().quad(
+                    f"@schema:{entity_kind_a}", f"@schema:{relationship_kind}", f"v:variable_{relationship_kind}", "schema"
+                ).delete_quad(
+                    f"@schema:{entity_kind_a}", f"@schema:{relationship_kind}", f"v:variable_{relationship_kind}", "schema"
+                ).quad(
+                    f"@schema:{entity_kind_a}", "sys:documentation", f"v:doc_{relationship_kind}", "schema"
+                ).quad(
+                    f"v:doc_{relationship_kind}", "sys:properties", f"v:rel_{relationship_kind}", "schema"
+                ).quad(
+                    f"v:rel_{relationship_kind}", f"@schema:{relationship_kind}", f"v:label_value_{relationship_kind}", "schema"
+                ).delete_quad(
+                    f"v:rel_{relationship_kind}", f"@schema:{relationship_kind}", f"v:label_value_{relationship_kind}", "schema"
+                )
+                for entity_kind_a, relationship_kind in zip(entity_kinds_a, relationship_kinds)
+            ]
+        )
+        return query.execute(self._client)
 
-    def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str):
-        return self.delete_relationship_kinds(entity_kind_a, [relationship_kind])
+    def delete_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
+        return self.delete_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])
