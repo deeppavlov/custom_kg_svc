@@ -956,10 +956,21 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             updated_properties.update(dict(zip(property_kinds, property_values)))
         return self._client.insert_document(updated_properties)
 
+    def search_for_entities_by_kinds(self, entity_kinds: List[str]):
+        query = WOQL().woql_or(*[
+            WOQL().quad("v:entity", "rdf:type", f"@schema:{entity_kind}", "instance")
+            for entity_kind in entity_kinds
+        ])
+        result = query.execute(self._client)
+        return result["bindings"]
+
+    def delete_entities(self, entity_ids: List[str]): # TODO: return 'Commit successfully made.'
+        return self._client.delete_document([
+            {"@id": entity_id} for entity_id in entity_ids
+        ])
+
     def delete_entity(self, entity_id: str):
-        return self._client.delete_document({
-            "@id": entity_id,
-        })
+        return self.delete_entities([entity_id])
 
     def create_or_update_properties_of_entities(self, entity_ids: List[str], property_kinds: List[List[str]], new_property_values: List[List[Any]]):
         # TODO: check the relationship kind_b validation
