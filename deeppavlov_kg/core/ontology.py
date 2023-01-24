@@ -1010,17 +1010,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             entity_kind, [property_kind], property_type, property_type_family
         )
 
-    def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]): #TODO: look into 'comment' instead of all these update_quad
-        entity_kind = entity_kinds.pop(0)
-        property_kind = property_kinds.pop(0)
-        label = labels.pop(0)
-        query = WOQL().woql_and(
-            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"), # TODO: try woql().string(label) instead of {'@type': "xsd:string", "@value": label}
-        )    
+    def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]):
+        query = WOQL().quad("v:a", "v:r", "v:b", "schema")
         for entity_kind, property_kind, label in zip(entity_kinds, property_kinds, labels):
             query = WOQL().woql_and(
                 query,
@@ -1032,15 +1023,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             )    
         return query.execute(self._client)
 
-    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str): #TODO: look into 'comment' instead of all these update_quad
-        query = WOQL().woql_and(
-            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
-        )    
-        return query.execute(self._client)
+    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str):
+        return self.update_labels_of_property_kinds([entity_kind], [property_kind], [label])
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         query = WOQL().woql_and(
