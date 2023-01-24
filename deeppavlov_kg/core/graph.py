@@ -964,10 +964,14 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         result = query.execute(self._client)
         return result["bindings"]
 
-    def delete_entities(self, entity_ids: List[str]): # TODO: return 'Commit successfully made.'
-        return self._client.delete_document([
-            {"@id": entity_id} for entity_id in entity_ids
-        ])
+    def delete_entities(self, entity_ids: List[str]):
+        try:
+            self._client.delete_document([
+                {"@id": entity_id} for entity_id in entity_ids
+            ])
+            return "Commit successfully made."
+        except DatabaseError as exception:
+            raise exception
 
     def delete_entity(self, entity_id: str):
         return self.delete_entities([entity_id])
