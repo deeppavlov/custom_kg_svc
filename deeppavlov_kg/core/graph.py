@@ -12,6 +12,9 @@ from deeppavlov_kg.core import querymaker
 from terminusdb_client import WOQLClient, WOQLQuery as WOQL
 from terminusdb_client.errors import InterfaceError, DatabaseError
 
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class KnowledgeGraph:
     def __init__(
         self,
@@ -215,7 +218,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             else:
                 return None
         except ClientError as exc:
-            logging.error(
+            logger.error(
                 """The given entity has no current state node. Either the entity is no longer active,
                 or it's not a versioner node. Try calling get_entity_state_by_date
                 The next error has occured %s""",
@@ -451,7 +454,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if nodes:
             return [dict(node.items()) for [node] in nodes]
         else:
-            logging.warning("No node has been updated")
+            logger.warning("No node has been updated")
             return None
     
     def create_or_update_properties_of_entity(
@@ -811,7 +814,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if deletion_date is None:
             deletion_date = datetime.datetime.now()
         if not self.search_for_relationships(relationship_kind, id_a=id_a, id_b=id_b):
-            logging.error("No such a relationship to be deleted")
+            logger.error("No such a relationship to be deleted")
             return None
 
         match_a, match_b = [""] * 2
@@ -922,8 +925,9 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         TEAM = self._client.team
         self._client.delete_database(DB, team=TEAM)
         self._client.create_database(DB, team=TEAM)
-        logging.info("Database was recreated successfully")
+        logger.info("Database was recreated successfully")
         self.ontology.init_abstract_kind()
+        logger.info("Abstract kind has been initialized")
 
 
     def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
