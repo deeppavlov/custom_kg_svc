@@ -12,6 +12,9 @@ from deeppavlov_kg.core import querymaker
 from terminusdb_client import WOQLClient, WOQLQuery as WOQL
 from terminusdb_client.errors import InterfaceError, DatabaseError
 
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class KnowledgeGraph:
     def __init__(
         self,
@@ -215,7 +218,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
             else:
                 return None
         except ClientError as exc:
-            logging.error(
+            logger.error(
                 """The given entity has no current state node. Either the entity is no longer active,
                 or it's not a versioner node. Try calling get_entity_state_by_date
                 The next error has occured %s""",
@@ -451,7 +454,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if nodes:
             return [dict(node.items()) for [node] in nodes]
         else:
-            logging.warning("No node has been updated")
+            logger.warning("No node has been updated")
             return None
     
     def create_or_update_properties_of_entity(
@@ -811,7 +814,7 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
         if deletion_date is None:
             deletion_date = datetime.datetime.now()
         if not self.search_for_relationships(relationship_kind, id_a=id_a, id_b=id_b):
-            logging.error("No such a relationship to be deleted")
+            logger.error("No such a relationship to be deleted")
             return None
 
         match_a, match_b = [""] * 2
@@ -914,7 +917,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
                 except InterfaceError:
                     self._client.connect(team=self._team, use_token=True)
                     self._client.create_database(db_name)
-        self.ontology = TerminusdbOntologyConfig(self._client)
+        self.ontology = TerminusdbOntologyConfig(self._client, self)
 
     def drop_database(self):
         """Clears the database from ontology and knowledge graphs."""
@@ -922,7 +925,9 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         TEAM = self._client.team
         self._client.delete_database(DB, team=TEAM)
         self._client.create_database(DB, team=TEAM)
-        logging.info("Database was recreated successfully")
+        logger.info("Database was recreated successfully")
+        self.ontology.init_abstract_kind()
+        logger.info("Abstract kind has been initialized")
 
 
     def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
@@ -1031,12 +1036,18 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         return self._client.get_document(entity_id)
 
     def create_relationships(self, ids_a: List[str], relationship_kinds: List[str], ids_b: List[str]):
+        entity_a_kinds = self.ontology._get_kinds_out_of_ids(ids_a)
+        entity_b_kinds = self.ontology._get_kinds_out_of_ids(ids_b)
+        relationship_kinds = self.ontology._get_relationship_kinds_by_labels_and_entity_kinds(
+            kinds_a=entity_a_kinds, relationship_labels=relationship_kinds, kinds_b=entity_b_kinds
+        )
+
         lists_of_rel_kinds = [[rel] for rel in relationship_kinds]
         lists_of_ids_b = [[id_b] for id_b in ids_b]
         return self.create_or_update_properties_of_entities(ids_a, lists_of_rel_kinds, lists_of_ids_b)
 
     def create_relationship(self, id_a: str, relationship_kind: str, id_b: str):
-        self.create_or_update_property_of_entity(id_a, relationship_kind, id_b)
+        return self.create_relationships([id_a], [relationship_kind], [id_b])
 
     def search_for_relationships(
         self,
@@ -1058,6 +1069,8 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         pretty_results = []
         for result in results:
             dic = {k.split(":")[-1]: v.split(":")[-1] for k,v in result.items()}
+            if "rel" in dic:
+                dic["rel"] = self.ontology._full_qualified_rel_kind2rel_kind(dic["rel"])
             pretty_results.append(dic)
         return pretty_results
 
