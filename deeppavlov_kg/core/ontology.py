@@ -12,6 +12,9 @@ import re
 from terminusdb_client.errors import DatabaseError
 from terminusdb_client import WOQLQuery as WOQL
 
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class Kind:
     """A class to represent an entity. It's used as argument for treelib node data"""
 
@@ -140,12 +143,12 @@ class Neo4jOntologyConfig(OntologyConfig):
           kind node in case of success, None otherwise
         """
         if tree is None:
-            logging.error("Ontology graph is empty")
+            logger.error("Ontology graph is empty")
             return None
 
         kind_node = tree.get_node(kind)
         if kind_node is None:
-            logging.error("Kind '%s' is not in ontology graph", kind)
+            logger.error("Kind '%s' is not in ontology graph", kind)
             return None
         return kind_node
 
@@ -199,10 +202,10 @@ class Neo4jOntologyConfig(OntologyConfig):
         """
         data_model = self._load_ontology_data_model()
         if data_model is None:
-            logging.error("The data model is empty")
+            logger.error("The data model is empty")
             return False
         if relationship_kind not in data_model:
-            logging.error(
+            logger.error(
                 "Relationship kind '%s' is not in data model", relationship_kind
             )
             return False
@@ -214,7 +217,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             if (kind_a, kind_b) == (model_a, model_b):
                 for idx, prop in enumerate(rel_property_kinds):
                     if prop not in model_properties:
-                        logging.error(
+                        logger.error(
                             """The property '%s' isn't in '%s' properties in ontology data model.
                             Use create_properties_of_relationship_kind() function to add it""",
                             prop,
@@ -224,7 +227,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                     else:
                         property_type = model_properties[prop]["type"]
                         if str(type(rel_property_values[idx])) != property_type:
-                            logging.error(
+                            logger.error(
                                 "Property '%s' should be of type: '%s'",
                                 prop,
                                 property_type,
@@ -290,7 +293,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         if parent_node is None:
             parent_node = self.create_entity_kind(parent, "Kind")
             tree = self._load_ontology_kinds_hierarchy()
-            logging.warning(
+            logger.warning(
                 "Not-in-database kind '%s'. Has been added as a child of 'Kind'", parent
             )
         kind_properties_dict = {}
@@ -313,7 +316,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             )
             self._save_ontology_kinds_hierarchy(tree)
         except DuplicatedNodeIdError:
-            logging.info(
+            logger.info(
                 "The '%s' kind exists in database. No new kind has been created", kind
             )
 
@@ -330,7 +333,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         tree.remove_node(entity_kind)
 
         self._save_ontology_kinds_hierarchy(tree)
-        logging.info(
+        logger.info(
             "Kind '%s' has been removed successfully from ontology graph", entity_kind
         )
 
@@ -356,8 +359,8 @@ class Neo4jOntologyConfig(OntologyConfig):
     def create_property_kinds_of_entity_kind(
         self,
         kind: str,
-        property_kinds: List[str],
-        property_types: Optional[List[Type]] = None,
+        new_property_kinds: List[str],
+        new_property_types: Optional[List[Type]] = None,
         # new_property_measurement_units: Optional[List[str]] = None,
     ) -> dict:
         """Creates a list of properties of a given kind
@@ -389,7 +392,7 @@ class Neo4jOntologyConfig(OntologyConfig):
 
         tree = self._load_ontology_kinds_hierarchy()
         if tree is None:
-            logging.error(
+            logger.error(
                 "Ontology kinds hierarchy is empty. Couldn't create entity kind properties"
             )
             return None
@@ -408,7 +411,7 @@ class Neo4jOntologyConfig(OntologyConfig):
             )
 
         self._save_ontology_kinds_hierarchy(tree)
-        logging.info("Properties has been updated successfully")
+        logger.info("Properties has been updated successfully")
         return self._node2dict(kind_node)
 
     def create_property_kind_of_entity_kind(self, entity_kind: str, property_kind: str, property_type: Type):
@@ -427,7 +430,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                                       "no property was deleted.")
 
             self._save_ontology_kinds_hierarchy(tree)
-            logging.info("Property kinds has been deleted successfully")
+            logger.info("Property kinds has been deleted successfully")
         else:
             raise ValueError(f"The ontology kinds hierarych is empty or the entity kind '{entity_kind}' doesn't exist. "
                               "no property was deleted.")
@@ -490,7 +493,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                     [entity_kind_a, entity_kind_b, rel_properties_dict]
                 )
             else:
-                logging.info(
+                logger.info(
                     """Same relationship "(%s, %s, %s)" is already in the data model, """
                     """no new relationship kind was created""",
                     entity_kind_a,
@@ -503,7 +506,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                 {relationship_kind: [[entity_kind_a, entity_kind_b, rel_properties_dict]]}
             )
         self._save_ontology_data_model(data_model)
-        logging.info(
+        logger.info(
             """Relationship "(%s, %s, %s)" was added to data model""",
             entity_kind_a,
             relationship_kind,
@@ -530,7 +533,7 @@ class Neo4jOntologyConfig(OntologyConfig):
                     if [entity_kind_a, entity_kind_b] == [relationship[0], relationship[1]]:
                         data_model[relationship_kind].pop(idx)
                 self._save_ontology_data_model(data_model)
-                logging.info("relationship kinds has been deleted successfully")
+                logger.info("relationship kinds has been deleted successfully")
             else:
                 raise ValueError("The given relationship doesn't exist. No relationship kind has been deleted")
         else:
@@ -573,7 +576,7 @@ class Neo4jOntologyConfig(OntologyConfig):
 
         data_model = self._load_ontology_data_model()
         if data_model is None:
-            logging.error("Data model is empty. Couldn't find relationships")
+            logger.error("Data model is empty. Couldn't find relationships")
             return None
         if relationship_kind in data_model:
             for model_idx, (knd_a, knd_b, _) in enumerate(data_model[relationship_kind]):
@@ -603,7 +606,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         """
         tree = self._load_ontology_kinds_hierarchy()
         if tree is None:
-            logging.error(
+            logger.error(
                 "Ontology kinds hierarchy is empty. Can't show entity kinds hierarchy"
             )
             return None
@@ -619,7 +622,7 @@ class Neo4jOntologyConfig(OntologyConfig):
         """Displays the data model in a pretty way."""
         data_model = self._load_ontology_data_model()
         if data_model is None:
-            logging.info("The data model is empty")
+            logger.info("The data model is empty")
             return None
         for relationship_kind in data_model:
             for kind_a, kind_b, properties in data_model[relationship_kind]:
@@ -652,6 +655,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             property_kinds=[["Name"]]*len(entity_kinds),
             property_values=[[kind] for kind in entity_kinds]
         )
+        for kind, entity_id in zip(entity_kinds, entity_ids):
+            logger.info(f"added abstract kind --- {kind} --- {entity_id}")
         existing_parents = parents.copy()
         entity_with_parents = entity_ids.copy()
         for entity_id, parent in zip(entity_ids, parents):
@@ -810,7 +815,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
             return abstract_kinds_instances
         elif result["api:status"] == "api:success":
-            logging.info("Abstract kind is already in database")
+            logger.info("Abstract kind is already in database")
         else:
             raise DatabaseError(f"failed to commit to schema, message: {result['api:status']}")
 
@@ -1010,17 +1015,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             entity_kind, [property_kind], property_type, property_type_family
         )
 
-    def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]): #TODO: look into 'comment' instead of all these update_quad
-        entity_kind = entity_kinds.pop(0)
-        property_kind = property_kinds.pop(0)
-        label = labels.pop(0)
-        query = WOQL().woql_and(
-            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"), # TODO: try woql().string(label) instead of {'@type': "xsd:string", "@value": label}
-        )    
+    def update_labels_of_property_kinds(self, entity_kinds: List[str], property_kinds: List[str], labels: List[str]):
+        query = WOQL().quad("v:a", "v:r", "v:b", "schema")
         for entity_kind, property_kind, label in zip(entity_kinds, property_kinds, labels):
             query = WOQL().woql_and(
                 query,
@@ -1032,15 +1028,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
             )    
         return query.execute(self._client)
 
-    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str): #TODO: look into 'comment' instead of all these update_quad
-        query = WOQL().woql_and(
-            WOQL().update_quad(f"@schema:{entity_kind}", "sys:documentation", f"@schema:{entity_kind}/0/documentation/Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "rdf:type", "sys:Documentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation", "sys:properties", f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", "rdf:type", "sys:PropertyDocumentation", "schema"),
-            WOQL().update_quad(f"@schema:{entity_kind}/0/documentation/Documentation/properties/{property_kind}", f"@schema:{property_kind}", {'@type': "xsd:string", "@value": label}, "schema"),
-        )    
-        return query.execute(self._client)
+    def update_label_of_property_kind(self, entity_kind: str, property_kind: str, label: str):
+        return self.update_labels_of_property_kinds([entity_kind], [property_kind], [label])
 
     def delete_property_kinds(self, entity_kind: str, property_kinds: List[str]):
         query = WOQL().woql_and(
@@ -1064,7 +1053,6 @@ class TerminusdbOntologyConfig(OntologyConfig):
     ):
         relationship_kind_labels = relationship_kinds.copy()
         relationship_kinds = self._rel_kinds2full_qualified_rel_kinds(relationship_kinds, entity_kinds_b)
-        ttl_schema_parts = []
 
         query = WOQL().quad("v:a", "v:r", "v:c", "schema")
         for entity_kind_a, rel_kind, entity_kind_b in zip(
@@ -1078,7 +1066,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     WOQL().add_quad(uri, "rdf:type", f"sys:Set", "schema"),
                 )
         query.execute(self._client)
-        return self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
+        results = self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
+        for kind_a, rel_kind, label in zip(
+            entity_kinds_a, relationship_kinds, relationship_kind_labels
+        ):
+            logger.info(f"Created relationship kind '{kind_a}--{rel_kind}' with label '{label}' successfully")
+        return results
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])
