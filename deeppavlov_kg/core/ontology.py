@@ -641,6 +641,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         self.kg = kg
         if self._client.get_class_frame("Abstract").get("Name") is None:
             self.init_abstract_kind()
+            logger.info("Abstract kind has been initialized")
 
     def init_abstract_kind(self):
         self.create_entity_kind("Abstract") # TODO: merge it all in one-line code: create [entity_kinds, properties, relationships]
@@ -656,7 +657,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             property_values=[[kind] for kind in entity_kinds]
         )
         for kind, entity_id in zip(entity_kinds, entity_ids):
-            logger.info(f"added abstract kind --- {kind} --- {entity_id}")
+            logger.info(f"Added abstract instance --- id='{entity_id}' --- Name property='{kind}'")
         existing_parents = parents.copy()
         entity_with_parents = entity_ids.copy()
         for entity_id, parent in zip(entity_ids, parents):
@@ -815,7 +816,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
             return abstract_kinds_instances
         elif result["api:status"] == "api:success":
-            logger.info("Abstract kind is already in database")
+            logger.info(f"Kinds '{entity_kinds}' are already in database")
         else:
             raise DatabaseError(f"failed to commit to schema, message: {result['api:status']}")
 
@@ -1067,10 +1068,10 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 )
         query.execute(self._client)
         results = self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
-        for kind_a, rel_kind, label in zip(
-            entity_kinds_a, relationship_kinds, relationship_kind_labels
+        for kind_a, rel_kind, kind_b, label in zip(
+            entity_kinds_a, relationship_kinds, entity_kinds_b, relationship_kind_labels
         ):
-            logger.info(f"Created relationship kind '{kind_a}--{rel_kind}' with label '{label}' successfully")
+            logger.info(f"Created relationship kind '{kind_a}--{rel_kind}->{kind_b}' with label '{label}' successfully")
         return results
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
