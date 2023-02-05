@@ -921,15 +921,18 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         self.ontology = TerminusdbOntologyConfig(self._client, self)
 
     def drop_database(self):
-        """Clears the database from ontology and knowledge graphs."""
-        DB = self._client.db
-        TEAM = self._client.team
-        self._client.delete_database(DB, team=TEAM)
-        self._client.create_database(DB, team=TEAM)
-        logger.info("Database was recreated successfully")
-        self.ontology.init_abstract_kind()
-        logger.info("Abstract kind has been initialized")
-
+        """Clears only the knowledge graph database keeping the ontology withou change."""
+        query = WOQL().quad(
+            "v:a", "v:r", "v:b", "instance"
+        ).woql_not(
+            WOQL().quad("v:a", "rdf:type", "@schema:Abstract", "instance")
+        ).delete_quad(
+            "v:a", "v:r", "v:b", "instance"
+        )
+        results = query.execute(self._client)
+        if results == "Commit successfully made.":
+            logger.info("Graph database was cleared successfully")
+        return results
 
     def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
         """create an entity, or rewrite above it if it exists"""

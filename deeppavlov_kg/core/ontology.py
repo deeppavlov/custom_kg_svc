@@ -791,6 +791,16 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     #return a list of parents not only the last appended one )
         return pretty_results
 
+    def drop_database(self):
+        """Clears the database from ontology and knowledge graphs."""
+        DB = self._client.db
+        TEAM = self._client.team
+        self._client.delete_database(DB, team=TEAM)
+        self._client.create_database(DB, team=TEAM)
+        logger.info("Database was recreated successfully")
+        self.init_abstract_kind()
+        logger.info("Abstract kind has been initialized")
+
     def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
         """Creates entity kinds and adds each kind as instance of 'Abstract' kind.
 
