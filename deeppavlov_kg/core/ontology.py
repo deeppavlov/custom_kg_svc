@@ -792,11 +792,19 @@ class TerminusdbOntologyConfig(OntologyConfig):
         return pretty_results
 
     def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
+        """Creates entity kinds and adds each kind as instance of 'Abstract' kind.
+
+        Raises:
+          ValueError: If at least one of the entity kinds already exists in DB.
+
+        """
         if parents is None:
             parents = [None]*len(entity_kinds)
 
         query = WOQL().woql_and(*[
-            WOQL().add_quad(":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema") for entity_kind in entity_kinds
+            WOQL().woql_not(WOQL().quad(":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema")).add_quad(
+            ":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema"
+            ) for entity_kind in entity_kinds
         ])
 
         query = WOQL().woql_and(
@@ -815,10 +823,8 @@ class TerminusdbOntologyConfig(OntologyConfig):
                 abstract_kinds_instances = None
 
             return abstract_kinds_instances
-        elif result["api:status"] == "api:success":
-            logger.info(f"Kinds '{entity_kinds}' are already in database")
-        else:
-            raise DatabaseError(f"failed to commit to schema, message: {result['api:status']}")
+        elif result["api:status"] == "api:success" and not result["bindings"]:
+            raise ValueError(f"""One or many of kinds "{entity_kinds}" is already in database""")
 
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self.create_entity_kinds([entity_kind], [parent])
