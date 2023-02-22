@@ -8,7 +8,7 @@ from neo4j import graph as neo4j_graph
 from neo4j.exceptions import ClientError
 from deeppavlov_kg.core.ontology import Neo4jOntologyConfig, TerminusdbOntologyConfig
 from deeppavlov_kg.core import querymaker
-
+from deeppavlov_kg.core.index import Index
 from terminusdb_client import WOQLClient, WOQLQuery as WOQL
 from terminusdb_client.errors import InterfaceError, DatabaseError
 
@@ -886,6 +886,7 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         local: bool = False,
         username: str = "admin",
         password: str = "root",
+        index_load_path: Optional[Path] = None,
     ):
         """
             Connecting to cloud doesn't need a password, just make sure you export your token or add it to '.env' file
@@ -919,8 +920,20 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
                     self._client.create_database(db_name)
         logger.info("Connected to the database")
         self.ontology = TerminusdbOntologyConfig(self._client, self)
+        if index_load_path is not None:
+            self.set_index(index_load_path)
+        else:
+            self.index = None
 
-    def drop_database(self):
+    def set_index(self, index_load_path):
+        self.index = Index(index_load_path)
+
+    def drop_database(self, drop_index=False):
+        if drop_index:
+            try:
+                self.index.drop_index()
+            except AttributeError:
+                raise ValueError("Index isn't loaded. Use set_index method")
         """Clears only the knowledge graph database keeping the ontology withou change."""
         query = WOQL().quad(
             "v:a", "v:r", "v:b", "instance"
@@ -934,8 +947,15 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             logger.info("Graph database was cleared successfully")
         return results
 
-    def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None):
+    def create_entities(self, entity_kinds: List[str], entity_ids: List[str], property_kinds: Optional[List[List[str]]] = None, property_values: Optional[List[List[Any]]] = None, add_to_index: bool = False):
         """create an entity, or rewrite above it if it exists"""
+        if add_to_index:
+            if self.index is None:
+                raise ValueError("Index isn't loaded. Use set_index method")
+            entity_substr_list = [id.split("/")[-1] for id in entity_ids]
+            logger.debug(f"Adding entities to index: entity_substr_list -- {entity_substr_list}")
+            self.index.add_entities(entity_substr_list, entity_ids, entity_kinds)
+
         assert len(entity_kinds) == len(entity_ids), (
             f"Number of entity kinds should equal number of entity ids. Got: {len(entity_kinds)} kinds and {len(entity_ids)} ids"
         )

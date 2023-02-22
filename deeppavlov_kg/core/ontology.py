@@ -791,8 +791,13 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     #return a list of parents not only the last appended one )
         return pretty_results
 
-    def drop_database(self):
+    def drop_database(self, drop_index=False): # TODO: add arg 'graph' and use it like graph.index.drop_index()
         """Clears the database from ontology and knowledge graphs."""
+        if drop_index:
+            try:
+                self.kg.index.drop_index()
+            except AttributeError:
+                raise ValueError("Index isn't loaded. Use set_index method")
         DB = self._client.db
         TEAM = self._client.team
         self._client.delete_database(DB, team=TEAM)
