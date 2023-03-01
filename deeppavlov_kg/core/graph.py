@@ -880,8 +880,8 @@ class Neo4jKnowledgeGraph(KnowledgeGraph):
 class TerminusdbKnowledgeGraph(KnowledgeGraph):
     def __init__(
         self,
-        team: str,
         db_name: str,
+        team: str = "",
         server: Optional[str] = None,
         local: bool = False,
         username: str = "admin",
@@ -903,6 +903,8 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
                 self._client.connect(key=password)
                 self._client.create_database(self._db)
         else:
+            if not self._team:
+                raise ValueError("team argument should be passed when you're connecting to local or cloud")
             if local:
                 self._client = WOQLClient("http://localhost:6363", account=username, team=self._team, key=password)
                 try:
