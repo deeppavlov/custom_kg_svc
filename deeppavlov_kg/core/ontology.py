@@ -816,7 +816,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
         if parents is None:
             parents = [None]*len(entity_kinds)
 
-        query = WOQL().woql_and(*[
+        query = WOQL().woql_or(*[
             WOQL().woql_not(WOQL().quad(":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema")).add_quad(
             ":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema"
             ) for entity_kind in entity_kinds
@@ -832,6 +832,14 @@ class TerminusdbOntologyConfig(OntologyConfig):
         result = query.execute(self._client)
 
         if result == "Commit successfully made.":
+            # create abstract instances only for entity kinds just created
+            existing_abstract_instances = self._client.get_documents_by_type("Abstract", as_list=True)
+            existing_abstract_instances = [inst["Name"] for inst in existing_abstract_instances]
+            for entity_kind, parent in zip(entity_kinds.copy(), parents.copy()):
+                if entity_kind in existing_abstract_instances:
+                    entity_kinds.remove(entity_kind)
+                    parents.remove(parent)
+
             if entity_kinds!=["Abstract"]:
                 abstract_kinds_instances = self._create_abstract_instances(entity_kinds, parents)
             else:
