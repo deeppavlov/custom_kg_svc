@@ -656,8 +656,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
             property_kinds=[["Name"]]*len(entity_kinds),
             property_values=[[kind] for kind in entity_kinds]
         )
-        for kind, entity_id in zip(entity_kinds, entity_ids):
-            logger.info(f"Added abstract instance --- id='{entity_id}' --- Name property='{kind}'")
+
         existing_parents = parents.copy()
         entity_with_parents = entity_ids.copy()
         for entity_id, parent in zip(entity_ids, parents):
@@ -806,7 +805,14 @@ class TerminusdbOntologyConfig(OntologyConfig):
         self.init_abstract_kind()
         logger.info("Abstract kind has been initialized")
 
-    def create_entity_kinds(self, entity_kinds: List[str], parents: Optional[List[Union[str, None]]] = None):
+    def create_entity_kinds(
+            self,
+            entity_kinds: List[str],
+            parents: Optional[Union[
+                List[Union[str, None]],
+                List[None]
+            ]] = None
+    ):
         """Creates entity kinds and adds each kind as instance of 'Abstract' kind.
 
         Raises:
@@ -840,6 +846,12 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     entity_kinds.remove(entity_kind)
                     parents.remove(parent)
 
+            for entity_kind, parent in zip(entity_kinds, parents):
+                if parent is None:
+                    logger.info(f"Created entity kind '{entity_kind}' without parent, successfully")
+                else:
+                    logger.info(f"Created entity kind '{entity_kind}' with parent '{parent}', successfully")
+
             if entity_kinds!=["Abstract"]:
                 abstract_kinds_instances = self._create_abstract_instances(entity_kinds, parents)
             else:
@@ -847,7 +859,7 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
             return abstract_kinds_instances
         elif result["api:status"] == "api:success" and not result["bindings"]:
-            raise ValueError(f"""One or many of kinds "{entity_kinds}" is already in database""")
+            raise ValueError(f"One or many kind in '{entity_kinds}' is already in database")
 
     def create_entity_kind(self, entity_kind: str, parent: Optional[str] = None):
         return self.create_entity_kinds([entity_kind], [parent])
@@ -1095,13 +1107,20 @@ class TerminusdbOntologyConfig(OntologyConfig):
                     WOQL().add_quad(uri, "sys:class", f"@schema:{entity_kind_b}", "schema"),
                     WOQL().add_quad(uri, "rdf:type", f"sys:Set", "schema"),
                 )
-        query.execute(self._client)
-        results = self.update_labels_of_property_kinds(entity_kinds_a, relationship_kinds, relationship_kind_labels)
-        for kind_a, rel_kind, kind_b, label in zip(
-            entity_kinds_a, relationship_kinds, entity_kinds_b, relationship_kind_labels
-        ):
-            logger.info(f"Created relationship kind '{kind_a}--{rel_kind}->{kind_b}' with label '{label}' successfully")
-        return results
+        creation_result = query.execute(self._client)
+        adding_label_result = self.update_labels_of_property_kinds(
+            entity_kinds_a, relationship_kinds, relationship_kind_labels
+        )
+        if (creation_result == "Commit successfully made." and 
+            adding_label_result == "Commit successfully made."):
+            for kind_a, rel_kind, kind_b, label in zip(
+                entity_kinds_a, relationship_kinds, entity_kinds_b, relationship_kind_labels
+            ):
+                logger.info(
+                    f"Created relationship kind '{kind_a}--{rel_kind}->{kind_b}' "
+                    f"with label '{label}' successfully"
+                )
+        return creation_result
 
     def create_relationship_kind(self, entity_kind_a: str, relationship_kind: str, entity_kind_b: str):
         return self.create_relationship_kinds([entity_kind_a], [relationship_kind], [entity_kind_b])

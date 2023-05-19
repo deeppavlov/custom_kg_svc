@@ -971,21 +971,31 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
             )
             for entity, property_kinds_of_this_entity, property_values_of_this_entity in zip(entities, property_kinds, property_values):
                 entity.update(dict(zip(property_kinds_of_this_entity, property_values_of_this_entity)))
-        return self._client.insert_document(entities)
+        result = self._client.insert_document(entities)
+        for entity_id in entity_ids:
+            logger.info(f"Created entity '{entity_id}' successfully")
+        return result
 
 
-    def create_entity(self, kind: str, entity_id: str, property_kinds: Optional[List[str]] = None, property_values: Optional[List[Any]] = None):
+    def create_entity(
+        self,
+        kind: str,
+        entity_id: str,
+        property_kinds: Optional[List[str]] = None,
+        property_values: Optional[List[Any]] = None
+    ):
         """create an entity, or rewrite above it if it exists"""
-        updated_properties = {
-            "@type": kind,
-            "@id": entity_id,
-        }
-        if property_kinds is not None and property_values is not None:
-            assert len(property_kinds) == len(property_values), (
-                "Number of property values should equal number of property kinds"
-            )
-            updated_properties.update(dict(zip(property_kinds, property_values)))
-        return self._client.insert_document(updated_properties)
+        if property_kinds is not None:
+            property_kinds = [property_kinds] #type: ignore
+        if property_values is not None:
+            property_values = [property_values]
+        return self.create_entities(
+            [kind],
+            [entity_id],
+            property_kinds, #type: ignore
+            property_values,
+        )
+
 
     def search_for_entities_by_kinds(self, entity_kinds: List[str]):
         query = WOQL().woql_or(*[
@@ -1020,15 +1030,16 @@ class TerminusdbKnowledgeGraph(KnowledgeGraph):
         for k, entity in entities_dict.items():
             entity.update({"@id":k})
         entities = list(entities_dict.values())
-        # try:
-        return self._client.update_document(entities)
-        # except DatabaseError as e:
-        #     raise DatabaseError(
-        #         f"""You must supply the required properties of this document at first. You can fill them with empty values suin.
-        #         Error: {e.error_obj["api:error"]["api:witnesses"][0]["@type"]}
-        #         Field: {e.error_obj["api:error"]["api:witnesses"][0]["field"]}
-        #         """
-        #     )
+
+        result = self._client.update_document(entities)
+        for entity_id, prop_kinds, prop_values in zip(
+            entity_ids, property_kinds, new_property_values
+        ):
+            logger.info(
+                f"Created or updated properties: '{entity_id}--{prop_kinds}->{prop_values}' successfully"
+            )
+        return result
+
     
     def create_or_update_properties_of_entity(self, entity_id: str, property_kinds: List[str], new_property_values: List[Any]):
         return self.create_or_update_properties_of_entities([entity_id], [property_kinds], [new_property_values])
