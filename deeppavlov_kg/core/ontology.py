@@ -976,7 +976,11 @@ class TerminusdbOntologyConfig(OntologyConfig):
 
     def get_entity_kind(self, entity_kind: str):
         """Returns entity kind direct properties as well as inherited ones from parents"""
-        return self._client.get_class_frame(entity_kind)
+        try:
+            properties = self._client.get_document(entity_kind, graph_type="schema")
+        except DatabaseError as exc:
+            raise ValueError(f"Entity kind '{entity_kind}' doesn't exist in KG") from exc
+        return properties
 
     def create_property_kinds_of_entity_kinds(
         self,
