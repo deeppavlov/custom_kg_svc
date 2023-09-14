@@ -822,6 +822,9 @@ class TerminusdbOntologyConfig(OntologyConfig):
         if parents is None:
             parents = [None]*len(entity_kinds)
 
+        entity_kinds = entity_kinds.copy()
+        parents = parents.copy()
+
         query = WOQL().woql_or(*[
             WOQL().woql_not(WOQL().quad(":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema")).add_quad(
             ":".join(["@schema", entity_kind]), "rdf:type", "sys:Class", "schema"
